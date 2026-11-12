@@ -1,0 +1,1052 @@
+{% extends "base.html" %}
+
+{% block titulo %}Resultados de la conciliación · Conciliador EO / SO{% endblock %}
+
+{% block estilos %}
+    /* ===== Resultados: secciones ===== */
+    .seccion {
+        margin-top: 32px;
+    }
+
+    .seccion-titulo {
+        font-size: 1.0625rem;
+        font-weight: 650;
+        letter-spacing: -0.01em;
+        line-height: 1.35;
+    }
+
+    .seccion-texto {
+        margin-top: 4px;
+        max-width: 72ch;
+        font-size: 0.875rem;
+        line-height: 1.6;
+        color: var(--texto-suave);
+    }
+
+    /* ===== Tarjetas: cifras, contadores y semáforos comparten estilo ===== */
+    .tarjeta,
+    .contador,
+    .semaforo-tarjeta {
+        background-color: var(--superficie);
+        border: 1px solid var(--borde-suave);
+        border-radius: var(--radio);
+        box-shadow: var(--sombra-suave);
+    }
+
+    /* Rótulos: misma escala y mismo tratamiento en las tres zonas. */
+    .tarjeta-rotulo,
+    .contador-rotulo,
+    .semaforo-etiqueta {
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        line-height: 1.35;
+        text-transform: uppercase;
+        color: var(--texto-suave);
+    }
+
+    /* Números: misma tipografía y cifras de ancho fijo en las tres zonas. */
+    .tarjeta-cifra,
+    .contador-cifra,
+    .semaforo-cifra {
+        font-weight: 700;
+        line-height: 1.1;
+        letter-spacing: -0.01em;
+        font-variant-numeric: tabular-nums;
+        overflow-wrap: anywhere;
+    }
+
+    /* ===== Resultados: tarjetas con las cifras monetarias ===== */
+    .tarjetas {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(232px, 1fr));
+        gap: 16px;
+        margin-top: 14px;
+    }
+
+    .tarjeta {
+        display: flex;
+        flex-direction: column;
+        padding: 20px 20px 18px;
+    }
+
+    .tarjeta--principal {
+        border-color: #b9c8db;
+        box-shadow: inset 0 3px 0 0 var(--acento), var(--sombra-suave);
+    }
+
+    .tarjeta-rotulo {
+        min-height: 2.7em;
+    }
+
+    .tarjeta-cifra {
+        margin-top: 8px;
+        font-size: clamp(1.75rem, 5vw, 2.5rem);
+        letter-spacing: -0.02em;
+    }
+
+    .tarjeta-pie {
+        margin-top: 10px;
+        font-size: 0.84rem;
+        line-height: 1.5;
+        color: var(--texto-suave);
+    }
+
+    .nota {
+        margin-top: 12px;
+        font-size: 0.8125rem;
+        line-height: 1.55;
+        color: var(--texto-suave);
+    }
+
+    /* Nota de registros sin pareja: el rojo refuerza, el texto lo explica. */
+    .nota--alerta {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 10px 14px;
+        border: 1px solid var(--rojo-borde);
+        border-left: 4px solid var(--rojo);
+        border-radius: var(--radio-pequeno);
+        background-color: var(--rojo-suave);
+        font-size: 0.875rem;
+        color: #7a271a;
+    }
+
+    /* ===== Resultados: contadores secundarios ===== */
+    .contadores {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-top: 14px;
+    }
+
+    .contador {
+        padding: 16px;
+    }
+
+    .contador-cifra {
+        font-size: clamp(1.5rem, 4vw, 1.875rem);
+    }
+
+    .contador-rotulo {
+        margin-top: 4px;
+    }
+
+    .contador-pie {
+        margin-top: 6px;
+        font-size: 0.8125rem;
+        line-height: 1.5;
+        color: var(--texto-suave);
+    }
+
+    /* Alerta: el color refuerza, nunca sustituye el texto de la etiqueta. */
+    .contador--alerta .contador-cifra {
+        color: var(--rojo);
+    }
+
+    /* ===== Resultados: semáforos ===== */
+    .semaforos {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+        margin-top: 14px;
+    }
+
+    .semaforo-tarjeta {
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+        padding: 18px 20px;
+    }
+
+    .semaforo-tarjeta--rojo {
+        border-color: var(--rojo-borde);
+        background-color: var(--rojo-suave);
+    }
+
+    .semaforo-tarjeta--verde {
+        border-color: var(--verde-borde);
+        background-color: var(--verde-suave);
+    }
+
+    .semaforo-punto {
+        flex: 0 0 auto;
+        width: 15px;
+        height: 15px;
+        margin-top: 8px;
+        border-radius: 50%;
+        border: 1px solid rgba(0, 0, 0, 0.14);
+    }
+
+    .semaforo-tarjeta--rojo .semaforo-punto {
+        background-color: var(--rojo);
+    }
+
+    .semaforo-tarjeta--verde .semaforo-punto {
+        background-color: var(--verde);
+    }
+
+    .semaforo-cifra {
+        font-size: 2rem;
+    }
+
+    .semaforo-etiqueta {
+        margin-top: 2px;
+    }
+
+    .resumen-semaforos {
+        margin-top: 14px;
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--texto);
+    }
+
+    .leyenda {
+        display: grid;
+        gap: 8px;
+        margin: 16px 0 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .leyenda li {
+        position: relative;
+        padding-left: 24px;
+        font-size: 0.875rem;
+        line-height: 1.5;
+        color: #374151;
+    }
+
+    .leyenda .semaforo-punto {
+        position: absolute;
+        left: 0;
+        top: 0.42em;
+        margin-top: 0;
+    }
+
+    .punto-rojo {
+        background-color: var(--rojo);
+    }
+
+    .punto-verde {
+        background-color: var(--verde);
+    }
+
+    /* ===== Tabla de cruces: filtros ===== */
+    .filtros {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 16px;
+    }
+
+    .filtro {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        min-width: 168px;
+    }
+
+    .filtro--texto {
+        flex: 1 1 280px;
+    }
+
+    .filtro-etiqueta {
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--texto-suave);
+    }
+
+    .filtro-campo {
+        width: 100%;
+        padding: 9px 11px;
+        border: 1px solid var(--borde);
+        border-radius: var(--radio-pequeno);
+        background-color: var(--superficie);
+        font-family: inherit;
+        font-size: 0.9375rem;
+        line-height: 1.4;
+        color: var(--texto);
+    }
+
+    .filtro-campo:hover {
+        border-color: #b6c2d1;
+    }
+
+    .filtro-campo:focus {
+        outline: 2px solid var(--foco);
+        outline-offset: 2px;
+        border-color: var(--acento);
+    }
+
+    .filtro-contador {
+        margin-top: 14px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        color: #374151;
+    }
+
+    /* ===== Tabla de cruces ===== */
+    .tabla-envoltura {
+        margin-top: 8px;
+        max-width: 100%;
+        max-height: 72vh;
+        overflow: auto;
+        border: 1px solid var(--borde-suave);
+        border-radius: var(--radio);
+        background-color: var(--superficie);
+        box-shadow: var(--sombra-suave);
+    }
+
+    .tabla-cruces {
+        width: 100%;
+        min-width: 920px;
+        border-collapse: collapse;
+        font-size: 0.875rem;
+    }
+
+    .tabla-cruces th,
+    .tabla-cruces td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--borde-suave);
+        text-align: left;
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+
+    .tabla-cruces thead th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background-color: #eef2f7;
+        border-bottom: 1px solid var(--borde);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: #33475b;
+    }
+
+    .tabla-cruces tbody tr:last-child td {
+        border-bottom: 0;
+    }
+
+    .tabla-cruces tbody tr:hover td {
+        background-color: #f8fafc;
+    }
+
+    .celda-cruce {
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        color: #33475b;
+    }
+
+    .tabla-cruces th.celda-numero,
+    .tabla-cruces td.celda-numero {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* Estado y semáforo: color como refuerzo, siempre con su texto. */
+    .etiqueta {
+        display: inline-block;
+        padding: 2px 9px;
+        border: 1px solid;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        line-height: 1.5;
+        white-space: nowrap;
+    }
+
+    .etiqueta--correcto {
+        background-color: var(--verde-suave);
+        border-color: var(--verde-borde);
+        color: #14532d;
+    }
+
+    .etiqueta--revisar {
+        background-color: var(--rojo-suave);
+        border-color: var(--rojo-borde);
+        color: #7a271a;
+    }
+
+    .semaforo-fila {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-weight: 600;
+    }
+
+    .punto {
+        display: inline-block;
+        flex: 0 0 auto;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        border: 1px solid rgba(0, 0, 0, 0.14);
+    }
+
+    .punto--rojo {
+        background-color: var(--rojo);
+    }
+
+    .punto--verde {
+        background-color: var(--verde);
+    }
+
+    .tabla-vacia {
+        margin-top: 16px;
+        padding: 24px 20px;
+        border: 1px dashed #b6c2d1;
+        border-radius: var(--radio);
+        background-color: var(--superficie);
+        font-size: 1rem;
+        line-height: 1.6;
+        color: var(--texto-suave);
+        text-align: center;
+    }
+
+    /* ===== Tabla de cruces: columna y botón de detalle (F4) ===== */
+    .tabla-cruces tbody tr {
+        cursor: pointer;
+    }
+
+    .celda-accion {
+        width: 1%;
+        white-space: nowrap;
+    }
+
+    .boton-detalle {
+        padding: 5px 14px;
+        border: 1px solid var(--borde);
+        border-radius: var(--radio-pequeno);
+        background-color: var(--superficie);
+        font-family: inherit;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        line-height: 1.4;
+        color: var(--acento);
+        cursor: pointer;
+    }
+
+    .boton-detalle:hover {
+        background-color: #eef2f7;
+        border-color: #b6c2d1;
+        color: var(--acento-fuerte);
+    }
+
+    .boton-detalle:active {
+        background-color: #e2e8f0;
+    }
+
+    .boton-detalle:focus-visible {
+        outline: 2px solid var(--foco);
+        outline-offset: 2px;
+    }
+
+    /* ===== Modal de detalle del cruce (F4) ===== */
+    /* El fondo de la página no se desplaza mientras el modal está abierto. */
+    body.modal-abierto {
+        overflow: hidden;
+    }
+
+    .modal-detalle {
+        width: min(880px, calc(100vw - 32px));
+        max-width: none;
+        max-height: calc(100vh - 40px);
+        max-height: calc(100dvh - 40px);
+        margin: auto;
+        padding: 0;
+        border: 1px solid var(--borde);
+        border-radius: var(--radio);
+        background-color: var(--superficie);
+        color: var(--texto);
+        box-shadow: 0 20px 50px rgba(15, 39, 68, 0.28);
+        overflow: hidden;
+    }
+
+    .modal-detalle::backdrop {
+        background-color: rgba(15, 23, 42, 0.55);
+    }
+
+    .modal-caja {
+        display: flex;
+        flex-direction: column;
+        max-height: calc(100vh - 40px);
+        max-height: calc(100dvh - 40px);
+    }
+
+    .modal-cabecera {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 18px 22px;
+        border-bottom: 1px solid var(--borde-suave);
+        background-color: #f8fafc;
+    }
+
+    .modal-cabecera-texto {
+        min-width: 0;
+    }
+
+    .modal-titulo {
+        font-size: 1.0625rem;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        line-height: 1.35;
+        font-variant-numeric: tabular-nums;
+        overflow-wrap: anywhere;
+    }
+
+    .modal-subtitulo {
+        margin-top: 3px;
+        font-size: 0.8125rem;
+        line-height: 1.45;
+        color: var(--texto-suave);
+    }
+
+    .modal-cerrar {
+        flex: 0 0 auto;
+        padding: 8px 18px;
+        border: 1px solid var(--acento);
+        border-radius: var(--radio-pequeno);
+        background-color: var(--acento);
+        font-family: inherit;
+        font-size: 0.875rem;
+        font-weight: 600;
+        line-height: 1.4;
+        color: #ffffff;
+        cursor: pointer;
+    }
+
+    .modal-cerrar:hover {
+        background-color: var(--acento-fuerte);
+        border-color: var(--acento-fuerte);
+    }
+
+    .modal-cerrar:active {
+        background-color: #102a48;
+        border-color: #102a48;
+    }
+
+    .modal-cerrar:focus-visible {
+        outline: 2px solid var(--foco);
+        outline-offset: 2px;
+    }
+
+    /* El cuerpo es lo único que se desplaza cuando el detalle es largo. */
+    .modal-cuerpo {
+        flex: 1 1 auto;
+        min-height: 0;
+        padding: 18px 22px 24px;
+        overflow-y: auto;
+    }
+
+    .modal-estado {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px 22px;
+        margin-top: 10px;
+    }
+
+    .modal-estado-grupo {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .modal-estado-rotulo {
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--texto-suave);
+    }
+
+    .modal-nota {
+        margin-top: 0;
+        font-size: 0.875rem;
+        line-height: 1.55;
+        color: #374151;
+    }
+
+    .modal-datos {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+        gap: 12px 20px;
+        margin: 16px 0 0;
+        padding: 14px 16px;
+        border: 1px solid var(--borde-suave);
+        border-radius: 8px;
+        background-color: #f8fafc;
+    }
+
+    .modal-dato dt {
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--texto-suave);
+    }
+
+    .modal-dato dd {
+        margin: 2px 0 0;
+        font-size: 0.9375rem;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        overflow-wrap: anywhere;
+    }
+
+    .modal-bloque {
+        margin-top: 22px;
+    }
+
+    .modal-seccion-titulo {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 8px;
+        margin: 0;
+        font-size: 0.9375rem;
+        font-weight: 650;
+        letter-spacing: -0.01em;
+    }
+
+    .modal-seccion-dato {
+        font-size: 0.8125rem;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        color: var(--texto-suave);
+    }
+
+    .modal-tabla-envoltura {
+        margin-top: 8px;
+        overflow-x: auto;
+        border: 1px solid var(--borde-suave);
+        border-radius: 8px;
+    }
+
+    .modal-tabla {
+        width: 100%;
+        min-width: 620px;
+        border-collapse: collapse;
+        font-size: 0.8125rem;
+    }
+
+    .modal-tabla th,
+    .modal-tabla td {
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--borde-suave);
+        text-align: left;
+        vertical-align: top;
+    }
+
+    .modal-tabla thead th {
+        background-color: #eef2f7;
+        border-bottom: 1px solid var(--borde);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: #33475b;
+        white-space: nowrap;
+    }
+
+    .modal-tabla th.celda-numero,
+    .modal-tabla td.celda-numero {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+
+    .modal-tabla .celda-codigo {
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        color: #33475b;
+        white-space: nowrap;
+    }
+
+    .modal-tabla tbody tr:last-child td {
+        border-bottom: 0;
+    }
+
+    .modal-tabla tfoot th,
+    .modal-tabla tfoot td {
+        border-top: 2px solid var(--borde);
+        border-bottom: 0;
+        background-color: #f8fafc;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .modal-vacio {
+        margin-top: 8px;
+        padding: 14px;
+        border: 1px dashed var(--borde);
+        border-radius: 8px;
+        background-color: #f8fafc;
+        font-size: 0.875rem;
+        color: var(--texto-suave);
+    }
+
+    .modal-totales {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+        gap: 12px;
+        margin-top: 8px;
+    }
+
+    .modal-total {
+        padding: 12px 14px;
+        border: 1px solid var(--borde-suave);
+        border-radius: 8px;
+        background-color: var(--superficie);
+    }
+
+    .modal-total--alerta {
+        border-color: var(--rojo-borde);
+        background-color: var(--rojo-suave);
+    }
+
+    .modal-total-rotulo {
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--texto-suave);
+    }
+
+    .modal-total-cifra {
+        margin-top: 4px;
+        font-size: 1.25rem;
+        font-weight: 700;
+        line-height: 1.2;
+        letter-spacing: -0.01em;
+        font-variant-numeric: tabular-nums;
+        overflow-wrap: anywhere;
+    }
+
+    .modal-total--alerta .modal-total-cifra {
+        color: #7a271a;
+    }
+
+    .modal-total-pie {
+        margin-top: 4px;
+        font-size: 0.8125rem;
+        line-height: 1.45;
+        color: var(--texto-suave);
+    }
+
+    .modal-total--alerta .modal-total-pie {
+        color: #7a271a;
+    }
+
+    .modal-analisis {
+        margin-top: 8px;
+        padding: 14px;
+        border: 1px solid var(--borde-suave);
+        border-left: 4px solid var(--acento);
+        border-radius: var(--radio-pequeno);
+        background-color: #f8fafc;
+        font-size: 0.9375rem;
+        line-height: 1.6;
+        overflow-wrap: anywhere;
+    }
+
+    /* Texto solo para lectores de pantalla. */
+    .solo-lectores {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        padding: 0;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    /* ===== Responsive ===== */
+    @media (max-width: 640px) {
+        .seccion {
+            margin-top: 28px;
+        }
+
+        .filtro,
+        .filtro--texto {
+            flex: 1 1 100%;
+            min-width: 0;
+        }
+
+        .tabla-envoltura {
+            max-height: none;
+        }
+
+        .tarjeta,
+        .contador {
+            padding: 16px;
+        }
+
+        .tarjeta-rotulo {
+            min-height: 0;
+        }
+
+        .semaforo-tarjeta {
+            padding: 16px;
+        }
+
+        /* En móvil el detalle ocupa toda la pantalla. */
+        .modal-detalle {
+            width: 100vw;
+            max-width: 100vw;
+            height: 100vh;
+            height: 100dvh;
+            max-height: 100vh;
+            max-height: 100dvh;
+            margin: 0;
+            border: 0;
+            border-radius: 0;
+        }
+
+        .modal-caja {
+            height: 100vh;
+            height: 100dvh;
+            max-height: 100vh;
+            max-height: 100dvh;
+        }
+
+        .modal-cabecera {
+            padding: 14px 16px;
+        }
+
+        .modal-cuerpo {
+            padding: 14px 16px 20px;
+        }
+
+        .modal-tabla {
+            min-width: 560px;
+        }
+
+        .modal-datos {
+            padding: 12px;
+        }
+    }
+
+    /* En pantallas muy angostas una sola columna: nada se sale de la página. */
+    @media (max-width: 480px) {
+        .tarjetas,
+        .contadores,
+        .semaforos {
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        .filtros {
+            gap: 10px;
+        }
+
+        .tarjeta-cifra {
+            font-size: 1.75rem;
+        }
+    }
+{% endblock %}
+
+{% block contenido %}
+{# Formato en español: miles con punto y decimales con coma. No recalcula nada. #}
+{% macro cifra(valor, decimales) -%}
+    {%- if valor is none -%}
+        —
+    {%- elif decimales == 0 -%}
+        {{- "{:,.0f}".format(valor).replace(",", "§").replace(".", ",").replace("§", ".") -}}
+    {%- else -%}
+        {{- "{:,.2f}".format(valor).replace(",", "§").replace(".", ",").replace("§", ".") -}}
+    {%- endif -%}
+{%- endmacro %}
+
+{# Si la pantalla recibe las cifras vacías, toda cifra se muestra «—». #}
+{% set cifras = cifras or {} %}
+
+<header class="pagina-cabecera">
+    <div>
+        <h2 class="pagina-titulo">Resultados de la conciliación</h2>
+        <p class="pagina-contexto">Archivo cargado.</p>
+    </div>
+    <div class="pagina-acciones">
+        <a class="boton-enlace" href="{{ url_for('descarga.descargar') }}">Descargar reporte</a>
+        <a class="boton-enlace boton-enlace--secundario" href="{{ url_for('main.inicio') }}">Cargar otro archivo</a>
+    </div>
+</header>
+
+{% if not ia_disponible %}
+<div class="banda-aviso" role="status">
+    <span class="banda-aviso-etiqueta">Aviso</span>
+    <span>
+        {% if ia_motivo %}
+            Análisis IA no disponible: {{ ia_motivo }}. Se muestra «no indicado».
+        {% else %}
+            Análisis IA no disponible. Se muestra «no indicado».
+        {% endif %}
+    </span>
+</div>
+{% endif %}
+
+<section class="seccion" aria-labelledby="titulo-cifras">
+    <h3 class="seccion-titulo" id="titulo-cifras">Cifras de control</h3>
+    <p class="seccion-texto">
+        Comparación del total de cada documento: primero la EO y luego su SO.
+    </p>
+
+    {# Los valores llegan ya calculados. Si falta uno, se muestra «—». #}
+    <div class="tarjetas">
+        <article class="tarjeta">
+            <p class="tarjeta-rotulo">Diferencia global EO − SO</p>
+            <p class="tarjeta-cifra">{{ cifra(cifras.get('diferencia_global'), 2) }}</p>
+            <p class="tarjeta-pie">
+                {{ cifra(cifras.get('cruces_total'), 0) }} cruces comparados.
+            </p>
+        </article>
+
+        <article class="tarjeta tarjeta--principal">
+            <p class="tarjeta-rotulo">Diferencias donde la EO supera a la SO</p>
+            <p class="tarjeta-cifra">{{ cifra(cifras.get('suma_diferencias_eo_mayor'), 2) }}</p>
+            <p class="tarjeta-pie">
+                Cifra principal de control · {{ cifra(cifras.get('cruces_total_mayor'), 0) }} cruces con Total EO mayor.
+            </p>
+        </article>
+
+        <article class="tarjeta">
+            <p class="tarjeta-rotulo">Diferencias de costo unitario</p>
+            <p class="tarjeta-cifra">{{ cifra(cifras.get('suma_diferencias_unitaria'), 2) }}</p>
+            <p class="tarjeta-pie">
+                {{ cifra(cifras.get('cruces_unitario_mayor'), 0) }} cruces con costo unitario mayor.
+            </p>
+        </article>
+    </div>
+
+    <p class="nota">Montos sin símbolo de moneda.</p>
+</section>
+
+<section class="seccion" aria-labelledby="titulo-contadores">
+    <h3 class="seccion-titulo" id="titulo-contadores">Contadores del archivo</h3>
+
+    <div class="contadores">
+        <div class="contador">
+            <p class="contador-cifra">{{ cifra(resumen['total_registros'], 0) }}</p>
+            <p class="contador-rotulo">Registros EO/SO</p>
+            <p class="contador-pie">
+                {{ cifra(resumen['total_eo'], 0) }} filas EO y {{ cifra(resumen['total_so'], 0) }} filas SO.
+            </p>
+        </div>
+
+        <div class="contador">
+            <p class="contador-cifra">{{ cifra(resumen['cruces'], 0) }}</p>
+            <p class="contador-rotulo">Cruces</p>
+            <p class="contador-pie">Pares EO–SO armados.</p>
+        </div>
+
+        <div class="contador{% if resumen['alertas_costo'] %} contador--alerta{% endif %}">
+            <p class="contador-cifra">{{ cifra(resumen['alertas_costo'], 0) }}</p>
+            <p class="contador-rotulo">Alertas de costo</p>
+            <p class="contador-pie">Cruces con Total EO mayor al de la SO.</p>
+        </div>
+
+        <div class="contador{% if resumen['en_revisar'] %} contador--alerta{% endif %}">
+            <p class="contador-cifra">{{ cifra(resumen['en_revisar'], 0) }}</p>
+            <p class="contador-rotulo">En revisar</p>
+            <p class="contador-pie">Cruces marcados «Revisar».</p>
+        </div>
+
+        <div class="contador">
+            <p class="contador-cifra">{{ cifra(resumen['correctos'], 0) }}</p>
+            <p class="contador-rotulo">Correctos</p>
+            <p class="contador-pie">Cruces en estado «Correcto».</p>
+        </div>
+
+        <div class="contador">
+            <p class="contador-cifra">{{ cifra(resumen['entradas'], 0) }}</p>
+            <p class="contador-rotulo">Entradas en la tabla</p>
+            <p class="contador-pie">Filas de la tabla de cruces.</p>
+        </div>
+
+        <div class="contador{% if resumen['sin_pareja'] %} contador--alerta{% endif %}">
+            <p class="contador-cifra">{{ cifra(resumen['sin_pareja'], 0) }}</p>
+            <p class="contador-rotulo">Sin pareja</p>
+            <p class="contador-pie">Documentos EO o SO sin contraparte.</p>
+        </div>
+
+        {# Detalle de líneas. Se leen con `get` para que la pantalla no falle si
+           la llave no viene; sin dato se muestra «—», igual que en las cifras. #}
+        <div class="contador">
+            <p class="contador-cifra">{{ cifra(resumen.get('lineas_eo'), 0) }}</p>
+            <p class="contador-rotulo">Líneas EO en cruces</p>
+            <p class="contador-pie">Filas EO dentro de los cruces.</p>
+        </div>
+
+        <div class="contador">
+            <p class="contador-cifra">{{ cifra(resumen.get('lineas_so'), 0) }}</p>
+            <p class="contador-rotulo">Líneas SO en cruces</p>
+            <p class="contador-pie">Filas SO dentro de los cruces.</p>
+        </div>
+
+        <div class="contador">
+            <p class="contador-cifra">{{ cifra(resumen.get('eo_con_dos_lineas'), 0) }}</p>
+            <p class="contador-rotulo">EO con 2 líneas</p>
+            <p class="contador-pie">Documentos EO con más de una línea.</p>
+        </div>
+    </div>
+
+    {% if resumen['sin_pareja'] %}
+        <p class="nota nota--alerta">
+            Hay registros sin pareja; aparecen marcados como Revisar.
+        </p>
+    {% endif %}
+</section>
+
+<section class="seccion" aria-labelledby="titulo-semaforos">
+    <h3 class="seccion-titulo" id="titulo-semaforos">Semáforos</h3>
+
+    <div class="semaforos">
+        <div class="semaforo-tarjeta semaforo-tarjeta--rojo">
+            <span class="semaforo-punto" aria-hidden="true"></span>
+            <div>
+                <p class="semaforo-cifra">{{ cifra(resumen['rojos'], 0) }}</p>
+                <p class="semaforo-etiqueta">rojos</p>
+            </div>
+        </div>
+
+        <div class="semaforo-tarjeta semaforo-tarjeta--verde">
+            <span class="semaforo-punto" aria-hidden="true"></span>
+            <div>
+                <p class="semaforo-cifra">{{ cifra(resumen['verdes'], 0) }}</p>
+                <p class="semaforo-etiqueta">verdes</p>
+            </div>
+        </div>
+    </div>
+
+    <p class="resumen-semaforos">
+        {{ cifra(resumen['rojos'], 0) }} rojos / {{ cifra(resumen['verdes'], 0) }} verdes.
+    </p>
+
+    <ul class="leyenda">
+        <li>
+            <span class="semaforo-punto punto-rojo" aria-hidden="true"></span>
+            <strong>Rojo:</strong> el costo de la EO supera al de la SO, o el cruce está marcado como «Revisar».
+        </li>
+        <li>
+            <span class="semaforo-punto punto-verde" aria-hidden="true"></span>
+            <strong>Verde:</strong> el cruce está en estado «Correcto».
+        </li>
+    </ul>
+</section>
+
+{# Tabla de cruces con filtro local por texto, estado y semáforo (F3). #}
+{% include "_tabla.html" %}
+{% endblock %}

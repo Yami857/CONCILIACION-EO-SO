@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block titulo %}Conciliador EO / SO{% endblock %}</title>
+    <style>
+        /* ===== Base ===== */
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
+
+        :root {
+            --fondo: #f5f6f8;
+            --superficie: #ffffff;
+            --texto: #1f2933;
+            --texto-suave: #55606c;
+            --borde: #d5dce4;
+            --borde-suave: #e8ecf1;
+            --acento: #1d4f8f;
+            --acento-fuerte: #163d6f;
+            --foco: #0f2744;
+            --ancho-max: 1080px;
+            --radio: 12px;
+            --radio-pequeno: 8px;
+            --sombra-suave: 0 1px 2px rgba(15, 39, 68, 0.05);
+            /* Semáforos: el color nunca va solo, siempre con su texto. */
+            --rojo: #b3261e;
+            --rojo-suave: #fdecea;
+            --rojo-borde: #f0c0bb;
+            --verde: #1e7e34;
+            --verde-suave: #e6f4ea;
+            --verde-borde: #b7dcc2;
+        }
+
+        html {
+            font-size: 16px;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto,
+                "Helvetica Neue", Arial, sans-serif;
+            font-size: 1rem;
+            line-height: 1.6;
+            color: var(--texto);
+            background-color: var(--fondo);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4,
+        p,
+        ul {
+            margin: 0;
+        }
+
+        /* El atributo hidden siempre oculta, también en filas de tabla. */
+        [hidden] {
+            display: none !important;
+        }
+
+        /* Foco visible y consistente en todo lo que se puede usar con el teclado.
+           El color nunca es la única señal: el contorno acompaña al texto. */
+        a:focus-visible,
+        button:focus-visible,
+        input:focus-visible,
+        select:focus-visible,
+        textarea:focus-visible,
+        [tabindex]:focus-visible {
+            outline: 2px solid var(--foco);
+            outline-offset: 2px;
+        }
+
+        .contenedor {
+            width: 100%;
+            max-width: var(--ancho-max);
+            margin: 0 auto;
+            padding-left: 24px;
+            padding-right: 24px;
+        }
+
+        /* Enlace de salto: visible solo al enfocarlo con el teclado. */
+        .salto-contenido {
+            position: absolute;
+            left: -9999px;
+            top: 0;
+            z-index: 10;
+            padding: 10px 16px;
+            background-color: var(--superficie);
+            color: var(--acento);
+            border: 1px solid var(--borde);
+            border-radius: 0 0 var(--radio) 0;
+            font-weight: 600;
+        }
+
+        .salto-contenido:focus {
+            left: 0;
+        }
+
+        /* ===== Cabecera ===== */
+        .cabecera {
+            background-color: var(--superficie);
+            border-bottom: 1px solid var(--borde-suave);
+        }
+
+        .cabecera-interna {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding-top: 18px;
+            padding-bottom: 18px;
+        }
+
+        .marca-icono {
+            flex: 0 0 auto;
+            display: inline-block;
+            padding: 6px 10px;
+            border: 1px solid var(--borde);
+            border-radius: 8px;
+            background-color: #eef2f7;
+            color: #33475b;
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            line-height: 1.2;
+            white-space: nowrap;
+        }
+
+        .marca-titulo {
+            font-size: 1.25rem;
+            font-weight: 650;
+            letter-spacing: -0.01em;
+            line-height: 1.3;
+        }
+
+        .marca-lema {
+            margin-top: 3px;
+            font-size: 0.875rem;
+            color: var(--texto-suave);
+        }
+
+        /* ===== Contenido ===== */
+        .principal {
+            flex: 1 0 auto;
+            padding-top: 32px;
+            padding-bottom: 48px;
+        }
+
+        /* ===== Mensajes (flash) ===== */
+        .mensajes {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 24px;
+        }
+
+        .mensaje {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-start;
+            gap: 10px 12px;
+            padding: 12px 14px;
+            border: 1px solid;
+            border-left-width: 4px;
+            border-radius: var(--radio-pequeno);
+            font-size: 1rem;
+            line-height: 1.55;
+        }
+
+        .mensaje-etiqueta {
+            flex: 0 0 auto;
+            padding: 1px 9px;
+            border: 1px solid rgba(0, 0, 0, 0.16);
+            border-radius: 999px;
+            background-color: rgba(255, 255, 255, 0.65);
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            line-height: 1.5;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .mensaje-texto {
+            flex: 1 1 240px;
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+
+        .mensaje--error {
+            background-color: #fef3f2;
+            border-color: #fda29b;
+            color: #7a271a;
+        }
+
+        .mensaje--exito {
+            background-color: #ecfdf3;
+            border-color: #a6f4c5;
+            color: #054f31;
+        }
+
+        .mensaje--aviso {
+            background-color: #fffaeb;
+            border-color: #fedf89;
+            color: #7a2e0e;
+        }
+
+        .mensaje--info {
+            background-color: #eff8ff;
+            border-color: #b2ddff;
+            color: #102a43;
+        }
+
+        /* ===== Encabezado de página y acciones ===== */
+        .pagina-cabecera {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 8px;
+        }
+
+        .pagina-titulo {
+            font-size: 1.5rem;
+            font-weight: 650;
+            letter-spacing: -0.01em;
+            line-height: 1.3;
+        }
+
+        .pagina-contexto {
+            margin-top: 4px;
+            font-size: 0.9375rem;
+            line-height: 1.5;
+            color: var(--texto-suave);
+        }
+
+        .pagina-acciones {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .boton-enlace {
+            display: inline-block;
+            padding: 11px 22px;
+            border: 1px solid var(--acento);
+            border-radius: var(--radio-pequeno);
+            background-color: var(--acento);
+            font-size: 0.9375rem;
+            font-weight: 600;
+            line-height: 1.4;
+            color: #ffffff;
+            text-align: center;
+            text-decoration: none;
+        }
+
+        .boton-enlace:hover {
+            background-color: var(--acento-fuerte);
+            border-color: var(--acento-fuerte);
+        }
+
+        .boton-enlace:active {
+            background-color: #102a48;
+            border-color: #102a48;
+        }
+
+        .boton-enlace:focus-visible {
+            outline: 2px solid var(--foco);
+            outline-offset: 2px;
+        }
+
+        .boton-enlace--secundario {
+            background-color: transparent;
+            border-color: var(--borde);
+            color: var(--acento);
+        }
+
+        .boton-enlace--secundario:hover {
+            background-color: #eef2f7;
+            border-color: #b6c2d1;
+            color: var(--acento-fuerte);
+        }
+
+        .boton-enlace--secundario:active {
+            background-color: #e2e8f0;
+        }
+
+        /* Banda discreta de avisos de la pantalla (por ejemplo, sin IA). */
+        .banda-aviso {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-start;
+            gap: 8px 12px;
+            margin-top: 20px;
+            padding: 12px 14px;
+            border: 1px solid var(--borde-suave);
+            border-left: 4px solid #94a3b8;
+            border-radius: var(--radio-pequeno);
+            background-color: #f8fafc;
+            font-size: 0.9375rem;
+            line-height: 1.55;
+            color: #374151;
+        }
+
+        .banda-aviso-etiqueta {
+            flex: 0 0 auto;
+            padding-top: 2px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--texto-suave);
+            white-space: nowrap;
+        }
+
+        /* ===== Pie ===== */
+        .pie {
+            flex: 0 0 auto;
+            padding-top: 18px;
+            padding-bottom: 18px;
+            border-top: 1px solid var(--borde-suave);
+            background-color: var(--superficie);
+        }
+
+        .pie p {
+            font-size: 0.8125rem;
+            color: var(--texto-suave);
+        }
+
+        /* ===== Responsive ===== */
+        @media (max-width: 640px) {
+            .contenedor {
+                padding-left: 16px;
+                padding-right: 16px;
+            }
+
+            .cabecera-interna {
+                align-items: flex-start;
+                gap: 12px;
+            }
+
+            .marca-titulo {
+                font-size: 1.1rem;
+            }
+
+            .marca-lema {
+                font-size: 0.8125rem;
+            }
+
+            .principal {
+                padding-top: 24px;
+                padding-bottom: 36px;
+            }
+
+            .pagina-cabecera {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .pagina-titulo {
+                font-size: 1.35rem;
+            }
+
+            .pagina-acciones {
+                width: 100%;
+            }
+
+            .boton-enlace {
+                flex: 1 1 200px;
+            }
+        }
+
+        {% block estilos %}{% endblock %}
+    </style>
+</head>
+<body>
+    <a class="salto-contenido" href="#contenido">Ir al contenido</a>
+
+    <header class="cabecera">
+        <div class="contenedor cabecera-interna">
+            <span class="marca-icono" aria-hidden="true">EO / SO</span>
+            <div>
+                <h1 class="marca-titulo">Conciliador EO / SO</h1>
+                <p class="marca-lema">
+                    Compara las entradas (EO) con las salidas (SO) por transformación y
+                    señala las diferencias de costo.
+                </p>
+            </div>
+        </div>
+    </header>
+
+    <main id="contenido" class="contenedor principal">
+        {% with mensajes = get_flashed_messages(with_categories=true) %}
+            {% if mensajes %}
+                <div class="mensajes" aria-live="polite">
+                    {% for categoria, texto in mensajes %}
+                        {% if categoria in ['error', 'danger', 'revisar'] %}
+                            {% set tipo = 'error' %}
+                            {% set etiqueta = 'Revisar' %}
+                            {% set rol = 'alert' %}
+                        {% elif categoria in ['success', 'exito'] %}
+                            {% set tipo = 'exito' %}
+                            {% set etiqueta = 'Listo' %}
+                            {% set rol = 'status' %}
+                        {% elif categoria in ['warning', 'aviso'] %}
+                            {% set tipo = 'aviso' %}
+                            {% set etiqueta = 'Aviso' %}
+                            {% set rol = 'status' %}
+                        {% else %}
+                            {% set tipo = 'info' %}
+                            {% set etiqueta = 'Información' %}
+                            {% set rol = 'status' %}
+                        {% endif %}
+                        <div class="mensaje mensaje--{{ tipo }}" role="{{ rol }}">
+                            <span class="mensaje-etiqueta">{{ etiqueta }}</span>
+                            <span class="mensaje-texto">{{ texto }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block contenido %}{% endblock %}
+    </main>
+
+    <footer class="pie">
+        <div class="contenedor">
+            <p>
+                Uso interno. La aplicación calcula y marca los cruces; la revisión
+                final de cada alerta corresponde a la persona responsable.
+            </p>
+        </div>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,31 @@
+# Secretos: la llave del agente de IA vive solo aquí y nunca se versiona.
+.env
+.env.*
+
+# Se permite versionar únicamente la plantilla de ejemplo.
+!.env.example
+
+# Datos reales de la empresa: el insumo nunca se sube al repositorio.
+INSUMOS/
+
+# Entorno virtual de uv.
+.venv/
+
+# Caché de Python.
+__pycache__/
+*.pyc
+
+# Carpeta de instancia de Flask (guarda los archivos subidos por el formulario).
+instance/
+
+# Caché de pytest.
+.pytest_cache/
+
+# Salidas de texto generadas por las pruebas.
+tests/_salida_pytest_*.txt
+
+# Archivos de registro y metadatos del sistema operativo.
+*.log
+.DS_Store
+Thumbs.db
+

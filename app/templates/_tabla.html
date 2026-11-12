@@ -1,0 +1,573 @@
+{#
+    Parcial autocontenido: tabla de cruces EO–SO con filtro local y detalle.
+    - No calcula cifras: muestra los valores que entrega el controller.
+    - El filtro (texto, estado y semáforo) y el detalle se resuelven con
+      JavaScript nativo.
+    - El detalle de cada cruce va en un <template> dentro de su fila: el HTML
+      lo arma Jinja (con su formato y su escape) y el modal solo lo clona.
+    - Los estilos de este parcial viven en el bloque `estilos` de
+      `resultados.html`, que se renderiza dentro del <style> de `base.html`.
+#}
+
+{# Formato español: miles con punto y decimales con coma. `None` → "—". #}
+{% macro monto(valor) -%}
+    {%- if valor is none -%}
+        —
+    {%- elif valor is number -%}
+        {{- "{:,.2f}".format(valor).replace(",", "§").replace(".", ",").replace("§", ".") -}}
+    {%- else -%}
+        {{- valor -}}
+    {%- endif -%}
+{%- endmacro %}
+
+{# Cantidades y kilos: hasta tres decimales, sin ceros sobrantes. #}
+{% macro cantidad(valor) -%}
+    {%- if valor is none -%}
+        —
+    {%- elif valor is number -%}
+        {%- set partes = "{:,.3f}".format(valor).split(".") -%}
+        {%- set decimales_txt = partes[1].rstrip("0") -%}
+        {%- set unido = partes[0] ~ (("," ~ decimales_txt) if decimales_txt else "") -%}
+        {{- unido.replace(",", "§").replace(".", ",").replace("§", ".") -}}
+    {%- else -%}
+        {{- valor -}}
+    {%- endif -%}
+{%- endmacro %}
+
+{# Códigos (bodega, No. Físico, No. Artículo): tal como llegan, sin separadores. #}
+{% macro codigo(valor) -%}
+    {%- if valor is none -%}
+        —
+    {%- elif valor is number -%}
+        {%- if valor % 1 == 0 -%}
+            {{- "{:.0f}".format(valor) -}}
+        {%- else -%}
+            {{- valor -}}
+        {%- endif -%}
+    {%- else -%}
+        {{- valor -}}
+    {%- endif -%}
+{%- endmacro %}
+
+{# Tabla de las líneas de un documento (EO o SO), con el total del documento. #}
+{% macro tabla_documento(lineas, cantidad_total, kilos_total, total, tipo) %}
+    {% if lineas %}
+        <div class="modal-tabla-envoltura">
+            <table class="modal-tabla">
+                <caption class="solo-lectores">
+                    Líneas del documento {{ tipo }} con artículo, cantidad, kilos, costo unitario y total.
+                </caption>
+                <thead>
+                    <tr>
+                        <th scope="col">No. Artículo</th>
+                        <th scope="col">Descripción Artículo</th>
+                        <th scope="col" class="celda-numero">Cantidad</th>
+                        <th scope="col">Unidad Med.</th>
+                        <th scope="col" class="celda-numero">Kilos</th>
+                        <th scope="col" class="celda-numero">Costo Uni.</th>
+                        <th scope="col" class="celda-numero">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for linea in lineas %}
+                        <tr>
+                            <td class="celda-codigo">{{ codigo(linea.get('No. Artículo')) }}</td>
+                            <td>{{ linea.get('Descripción Artículo') or '—' }}</td>
+                            <td class="celda-numero">{{ cantidad(linea.get('Cantidad')) }}</td>
+                            <td>{{ linea.get('Unidad Med.') or '—' }}</td>
+                            <td class="celda-numero">{{ cantidad(linea.get('Kilos')) }}</td>
+                            <td class="celda-numero">{{ monto(linea.get('Costo Uni.')) }}</td>
+                            <td class="celda-numero">{{ monto(linea.get('Total')) }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <th scope="row" colspan="2">Total del documento</th>
+                        <td class="celda-numero">{{ cantidad(cantidad_total) }}</td>
+                        <td></td>
+                        <td class="celda-numero">{{ cantidad(kilos_total) }}</td>
+                        <td></td>
+                        <td class="celda-numero">{{ monto(total) }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    {% else %}
+        <p class="modal-vacio">No hay líneas {{ tipo }} en este archivo para este cruce.</p>
+    {% endif %}
+{% endmacro %}
+
+<section class="seccion" id="tabla-cruces" aria-labelledby="titulo-tabla">
+    <h3 class="seccion-titulo" id="titulo-tabla">Cruces EO–SO</h3>
+    <p class="seccion-texto">
+        Un renglón por cada entrada (EO) con su salida (SO). La diferencia es el
+        Total de la EO menos el Total de la SO. Use «Ver» para abrir el detalle
+        con las líneas de ambos documentos.
+    </p>
+
+    <div class="filtros">
+        <div class="filtro filtro--texto">
+            <label class="filtro-etiqueta" for="filtro-texto">Buscar</label>
+            <input
+                class="filtro-campo"
+                id="filtro-texto"
+                type="search"
+                autocomplete="off"
+                placeholder="Cruce, bodega, usuario o artículo"
+            >
+        </div>
+
+        <div class="filtro">
+            <label class="filtro-etiqueta" for="filtro-estado">Estado</label>
+            <select class="filtro-campo" id="filtro-estado">
+                <option value="">Todos</option>
+                <option value="Correcto">Correcto</option>
+                <option value="Revisar">Revisar</option>
+            </select>
+        </div>
+
+        <div class="filtro">
+            <label class="filtro-etiqueta" for="filtro-semaforo">Semáforo</label>
+            <select class="filtro-campo" id="filtro-semaforo">
+                <option value="">Todos</option>
+                <option value="Rojo">Rojo</option>
+                <option value="Verde">Verde</option>
+            </select>
+        </div>
+    </div>
+
+    <p class="filtro-contador" id="contador-cruces" aria-live="polite">
+        Mostrando {{ cruces|length }} de {{ cruces|length }} cruces.
+    </p>
+
+    <div class="tabla-envoltura" id="envoltura-cruces">
+        <table class="tabla-cruces">
+            <caption class="solo-lectores">
+                Cruces EO–SO con bodega, usuario, totales, estado, semáforo y detalle.
+            </caption>
+            <thead>
+                <tr>
+                    <th scope="col">Cruce EO-SO</th>
+                    <th scope="col">Bodega</th>
+                    <th scope="col">Usuario</th>
+                    <th scope="col" class="celda-numero">Total EO</th>
+                    <th scope="col" class="celda-numero">Total SO</th>
+                    <th scope="col" class="celda-numero">Diferencia</th>
+                    <th scope="col">Estado</th>
+                    <th scope="col">Semáforo</th>
+                    <th scope="col">Detalle</th>
+                </tr>
+            </thead>
+            <tbody id="cuerpo-cruces">
+                {% for cruce in cruces %}
+                    {# Texto de búsqueda: identificador, bodega, usuario y artículos. #}
+                    {% set articulos = [] %}
+                    {% for linea in cruce['lineas_eo'] %}
+                        {% set _ = articulos.append(linea.get('Descripción Artículo')) %}
+                    {% endfor %}
+                    {% for linea in cruce['lineas_so'] %}
+                        {% set _ = articulos.append(linea.get('Descripción Artículo')) %}
+                    {% endfor %}
+                    {% set texto = ([cruce['id_cruce'], cruce['bodega'], cruce['usuario']] + articulos) | select | join(' ') %}
+
+                    <tr
+                        data-estado="{{ cruce['estado_revision'] }}"
+                        data-semaforo="{{ cruce['etiqueta_semaforo'] }}"
+                        data-texto="{{ texto }}"
+                        data-cruce="{{ cruce['id_cruce'] or '' }}"
+                    >
+                        <td class="celda-cruce">{{ cruce['id_cruce'] or '—' }}</td>
+                        <td>{{ codigo(cruce['bodega']) }}</td>
+                        <td>{{ cruce['usuario'] or '—' }}</td>
+                        <td class="celda-numero">
+                            {%- if cruce['lineas_eo'] -%}
+                                {{ monto(cruce['total_eo']) }}
+                            {%- else -%}
+                                —
+                            {%- endif -%}
+                        </td>
+                        <td class="celda-numero">
+                            {%- if cruce['lineas_so'] -%}
+                                {{ monto(cruce['total_so']) }}
+                            {%- else -%}
+                                —
+                            {%- endif -%}
+                        </td>
+                        <td class="celda-numero">
+                            {%- if cruce['lineas_eo'] and cruce['lineas_so'] -%}
+                                {{ monto(cruce['diferencia_costo']) }}
+                            {%- else -%}
+                                —
+                            {%- endif -%}
+                        </td>
+                        <td>
+                            {% if cruce['estado_revision'] == 'Revisar' %}
+                                <span class="etiqueta etiqueta--revisar">Revisar</span>
+                            {% else %}
+                                <span class="etiqueta etiqueta--correcto">Correcto</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if cruce['semaforo'] == 'rojo' %}
+                                <span class="semaforo-fila">
+                                    <span class="punto punto--rojo" aria-hidden="true"></span>
+                                    {{ cruce['etiqueta_semaforo'] or 'Rojo' }}
+                                </span>
+                            {% else %}
+                                <span class="semaforo-fila">
+                                    <span class="punto punto--verde" aria-hidden="true"></span>
+                                    {{ cruce['etiqueta_semaforo'] or 'Verde' }}
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="celda-accion">
+                            <button
+                                type="button"
+                                class="boton-detalle"
+                                aria-haspopup="dialog"
+                                aria-label="Ver detalle del cruce {{ cruce['id_cruce'] or 'sin identificador' }}"
+                            >
+                                Ver
+                            </button>
+
+                            {# Detalle del cruce: Jinja lo arma completo y el modal lo clona. #}
+                            <template class="plantilla-detalle">
+                                <div class="modal-cabecera">
+                                    <div class="modal-cabecera-texto">
+                                        <h3 class="modal-titulo">{{ cruce['id_cruce'] or 'Sin identificador' }}</h3>
+                                        <p class="modal-subtitulo">
+                                            Líneas de la entrada (EO) y de la salida (SO) de este cruce.
+                                        </p>
+                                        <div class="modal-estado">
+                                            <span class="modal-estado-grupo">
+                                                <span class="modal-estado-rotulo">Estado</span>
+                                                {% if cruce['estado_revision'] == 'Revisar' %}
+                                                    <span class="etiqueta etiqueta--revisar">Revisar</span>
+                                                {% else %}
+                                                    <span class="etiqueta etiqueta--correcto">Correcto</span>
+                                                {% endif %}
+                                            </span>
+                                            <span class="modal-estado-grupo">
+                                                <span class="modal-estado-rotulo">Semáforo</span>
+                                                <span class="semaforo-fila">
+                                                    {% if cruce['semaforo'] == 'rojo' %}
+                                                        <span class="punto punto--rojo" aria-hidden="true"></span>
+                                                    {% else %}
+                                                        <span class="punto punto--verde" aria-hidden="true"></span>
+                                                    {% endif %}
+                                                    {{ cruce['etiqueta_semaforo'] or 'Verde' }}
+                                                </span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <button type="button" class="modal-cerrar" data-cerrar>
+                                        Cerrar
+                                    </button>
+                                </div>
+
+                                <div class="modal-cuerpo">
+                                    <p class="modal-nota">
+                                        {% if cruce['costo_eo_mayor'] -%}
+                                            El Total de la EO ({{ monto(cruce['total_eo']) }}) supera al de la SO ({{ monto(cruce['total_so']) }}).
+                                        {%- elif cruce['lineas_eo'] and cruce['lineas_so'] -%}
+                                            El Total de la EO no supera al de la SO.
+                                        {%- else -%}
+                                            Este cruce no tiene los dos documentos en el archivo.
+                                        {%- endif %}
+                                        {% if cruce['estado_revision'] == 'Revisar' %}
+                                            Marcado «Revisar»: revise las líneas de este cruce.
+                                        {% endif %}
+                                    </p>
+
+                                    <dl class="modal-datos">
+                                        <div class="modal-dato">
+                                            <dt>Bodega</dt>
+                                            <dd>{{ codigo(cruce['bodega']) }}</dd>
+                                        </div>
+                                        <div class="modal-dato">
+                                            <dt>Usuario</dt>
+                                            <dd>{{ cruce['usuario'] or '—' }}</dd>
+                                        </div>
+                                        <div class="modal-dato">
+                                            <dt>No. Físico EO</dt>
+                                            <dd>{{ codigo(cruce['fisico_eo']) }}</dd>
+                                        </div>
+                                        <div class="modal-dato">
+                                            <dt>No. Físico SO</dt>
+                                            <dd>{{ codigo(cruce['fisico_so']) }}</dd>
+                                        </div>
+                                    </dl>
+
+                                    <section class="modal-bloque">
+                                        <h4 class="modal-seccion-titulo">
+                                            Documento EO
+                                            <span class="modal-seccion-dato">No. Físico {{ codigo(cruce['fisico_eo']) }}</span>
+                                        </h4>
+                                        {{ tabla_documento(
+                                            cruce['lineas_eo'],
+                                            cruce['cantidad_eo'],
+                                            cruce['kilos_eo'],
+                                            cruce['total_eo'],
+                                            'EO'
+                                        ) }}
+                                    </section>
+
+                                    <section class="modal-bloque">
+                                        <h4 class="modal-seccion-titulo">
+                                            Documento SO
+                                            <span class="modal-seccion-dato">No. Físico {{ codigo(cruce['fisico_so']) }}</span>
+                                        </h4>
+                                        {{ tabla_documento(
+                                            cruce['lineas_so'],
+                                            cruce['cantidad_so'],
+                                            cruce['kilos_so'],
+                                            cruce['total_so'],
+                                            'SO'
+                                        ) }}
+                                    </section>
+
+                                    <section class="modal-bloque">
+                                        <h4 class="modal-seccion-titulo">Totales del cruce</h4>
+                                        <div class="modal-totales">
+                                            <div class="modal-total">
+                                                <p class="modal-total-rotulo">Total EO</p>
+                                                <p class="modal-total-cifra">
+                                                    {%- if cruce['lineas_eo'] -%}
+                                                        {{ monto(cruce['total_eo']) }}
+                                                    {%- else -%}
+                                                        —
+                                                    {%- endif -%}
+                                                </p>
+                                            </div>
+
+                                            <div class="modal-total">
+                                                <p class="modal-total-rotulo">Total SO</p>
+                                                <p class="modal-total-cifra">
+                                                    {%- if cruce['lineas_so'] -%}
+                                                        {{ monto(cruce['total_so']) }}
+                                                    {%- else -%}
+                                                        —
+                                                    {%- endif -%}
+                                                </p>
+                                            </div>
+
+                                            <div class="modal-total{% if cruce['costo_eo_mayor'] %} modal-total--alerta{% endif %}">
+                                                <p class="modal-total-rotulo">Diferencia EO − SO</p>
+                                                <p class="modal-total-cifra">
+                                                    {%- if cruce['lineas_eo'] and cruce['lineas_so'] -%}
+                                                        {{ monto(cruce['diferencia_costo']) }}
+                                                    {%- else -%}
+                                                        —
+                                                    {%- endif -%}
+                                                </p>
+                                                <p class="modal-total-pie">
+                                                    {% if not cruce['lineas_eo'] or not cruce['lineas_so'] -%}
+                                                        No comparable: falta un documento.
+                                                    {%- elif cruce['costo_eo_mayor'] -%}
+                                                        Alerta de costo: la EO supera a la SO.
+                                                    {%- else -%}
+                                                        Sin alerta de costo: la EO no supera a la SO.
+                                                    {%- endif %}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </section>
+
+                                    <section class="modal-bloque">
+                                        <h4 class="modal-seccion-titulo">Análisis IA</h4>
+                                        <p class="modal-analisis">{{ cruce['analisis'] or 'no indicado' }}</p>
+                                    </section>
+                                </div>
+                            </template>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <p class="tabla-vacia" id="tabla-vacia" hidden>No hay cruces que coincidan con el filtro.</p>
+</section>
+
+{# Un solo modal: el contenido se clona desde el <template> de la fila. #}
+<dialog class="modal-detalle" id="modal-detalle" aria-label="Detalle del cruce">
+    <div class="modal-caja" id="modal-contenido"></div>
+</dialog>
+
+<script>
+    (function () {
+        "use strict";
+
+        var campoTexto = document.getElementById("filtro-texto");
+        var selectorEstado = document.getElementById("filtro-estado");
+        var selectorSemaforo = document.getElementById("filtro-semaforo");
+        var cuerpo = document.getElementById("cuerpo-cruces");
+        var envoltura = document.getElementById("envoltura-cruces");
+        var contador = document.getElementById("contador-cruces");
+        var vacio = document.getElementById("tabla-vacia");
+        var dialogo = document.getElementById("modal-detalle");
+        var contenidoModal = document.getElementById("modal-contenido");
+
+        if (!campoTexto || !cuerpo || !contador || !vacio) {
+            return;
+        }
+
+        var filas = cuerpo.getElementsByTagName("tr");
+        var total = filas.length;
+        var disparadorActual = null;
+
+        // Compara sin mayúsculas ni tildes, para que "articulo" encuentre "Artículo".
+        function normalizar(texto) {
+            var valor = (texto || "").toLowerCase();
+            if (typeof valor.normalize === "function") {
+                valor = valor.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            }
+            return valor;
+        }
+
+        function textoDeFila(fila) {
+            return normalizar(fila.getAttribute("data-texto"));
+        }
+
+        /* ===== Filtro local (texto, estado y semáforo) ===== */
+        function aplicarFiltro() {
+            var consulta = normalizar(campoTexto.value.replace(/^\s+|\s+$/g, ""));
+            var estado = selectorEstado ? selectorEstado.value : "";
+            var semaforo = selectorSemaforo ? selectorSemaforo.value : "";
+            var visibles = 0;
+
+            for (var i = 0; i < filas.length; i += 1) {
+                var fila = filas[i];
+                var coincideTexto = !consulta || textoDeFila(fila).indexOf(consulta) !== -1;
+                var coincideEstado = !estado || fila.getAttribute("data-estado") === estado;
+                var coincideSemaforo =
+                    !semaforo || fila.getAttribute("data-semaforo") === semaforo;
+                var mostrar = coincideTexto && coincideEstado && coincideSemaforo;
+
+                if (mostrar) {
+                    fila.removeAttribute("hidden");
+                    visibles += 1;
+                } else {
+                    // La fila oculta también oculta su botón «Ver» y su detalle.
+                    fila.setAttribute("hidden", "hidden");
+                }
+            }
+
+            contador.textContent =
+                "Mostrando " + visibles + " de " + total + " cruces.";
+            vacio.hidden = visibles !== 0;
+            if (envoltura) {
+                envoltura.hidden = visibles === 0;
+            }
+        }
+
+        campoTexto.addEventListener("input", aplicarFiltro);
+        if (selectorEstado) {
+            selectorEstado.addEventListener("change", aplicarFiltro);
+        }
+        if (selectorSemaforo) {
+            selectorSemaforo.addEventListener("change", aplicarFiltro);
+        }
+
+        aplicarFiltro();
+
+        /* ===== Detalle del cruce en un solo modal ===== */
+        if (!dialogo || !contenidoModal) {
+            return;
+        }
+
+        function abrirDetalle(fila) {
+            var plantilla = fila.querySelector("template.plantilla-detalle");
+            if (!plantilla || !plantilla.content) {
+                return;
+            }
+
+            // Se reemplaza el contenido: si el modal ya estaba abierto, se
+            // actualiza con la fila nueva sin abrirlo dos veces.
+            contenidoModal.textContent = "";
+            contenidoModal.appendChild(plantilla.content.cloneNode(true));
+
+            var cruce = fila.getAttribute("data-cruce") || "";
+            dialogo.setAttribute("aria-label", "Detalle del cruce " + cruce);
+            disparadorActual = fila.querySelector(".boton-detalle");
+
+            if (!dialogo.open) {
+                document.body.classList.add("modal-abierto");
+                if (typeof dialogo.showModal === "function") {
+                    dialogo.showModal();
+                } else {
+                    dialogo.setAttribute("open", "open");
+                }
+            }
+
+            var cerrar = contenidoModal.querySelector("[data-cerrar]");
+            if (cerrar) {
+                cerrar.focus();
+            }
+        }
+
+        function restaurarFoco() {
+            if (!disparadorActual || !document.contains(disparadorActual)) {
+                return;
+            }
+            // Si el filtro ocultó la fila, no se devuelve el foco a un elemento
+            // que ya no se ve.
+            if (disparadorActual.closest("[hidden]")) {
+                return;
+            }
+            disparadorActual.focus();
+        }
+
+        function cerrarDetalle() {
+            if (!dialogo.open) {
+                return;
+            }
+            if (typeof dialogo.close === "function") {
+                dialogo.close();
+                return;
+            }
+            dialogo.removeAttribute("open");
+            document.body.classList.remove("modal-abierto");
+            restaurarFoco();
+        }
+
+        // Un clic en una fila (o en su botón «Ver») abre el detalle. Si se está
+        // seleccionando texto con el ratón, no se abre.
+        cuerpo.addEventListener("click", function (evento) {
+            var objetivo = evento.target;
+            if (!objetivo || !objetivo.closest) {
+                return;
+            }
+            var fila = objetivo.closest("tr");
+            if (!fila || fila.parentNode !== cuerpo) {
+                return;
+            }
+            var seleccion = window.getSelection ? window.getSelection().toString() : "";
+            if (seleccion) {
+                return;
+            }
+            abrirDetalle(fila);
+        });
+
+        // Cerrar con el botón y con un clic en el fondo oscurecido.
+        dialogo.addEventListener("click", function (evento) {
+            var objetivo = evento.target;
+            if (objetivo === dialogo) {
+                cerrarDetalle();
+                return;
+            }
+            if (objetivo && objetivo.hasAttribute && objetivo.hasAttribute("data-cerrar")) {
+                cerrarDetalle();
+            }
+        });
+
+        // Escape: el navegador cierra el modal y aquí solo se limpia y se
+        // devuelve el foco al botón «Ver» que lo abrió.
+        dialogo.addEventListener("close", function () {
+            document.body.classList.remove("modal-abierto");
+            contenidoModal.textContent = "";
+            restaurarFoco();
+        });
+    })();
+</script>

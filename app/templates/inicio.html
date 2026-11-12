@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+
+{% block titulo %}Cargar movimientos · Conciliador EO / SO{% endblock %}
+
+{% block estilos %}
+    .panel {
+        padding: 28px;
+        background-color: var(--superficie);
+        border: 1px solid var(--borde-suave);
+        border-radius: var(--radio);
+        box-shadow: var(--sombra-suave);
+    }
+
+    .panel-titulo {
+        font-size: 1.375rem;
+        font-weight: 650;
+        letter-spacing: -0.01em;
+        line-height: 1.3;
+    }
+
+    .panel-texto {
+        margin-top: 10px;
+        max-width: 68ch;
+        font-size: 1rem;
+        line-height: 1.6;
+        color: #374151;
+    }
+
+    .requisitos {
+        display: grid;
+        gap: 8px;
+        margin: 22px 0 26px;
+        padding: 0;
+        list-style: none;
+    }
+
+    .requisitos li {
+        position: relative;
+        padding-left: 18px;
+        font-size: 0.9375rem;
+        line-height: 1.6;
+        color: var(--texto-suave);
+    }
+
+    .requisitos li::before {
+        content: "";
+        position: absolute;
+        left: 4px;
+        top: 0.62em;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background-color: #94a3b8;
+    }
+
+    .codigo {
+        padding: 1px 5px;
+        border: 1px solid var(--borde-suave);
+        border-radius: 5px;
+        background-color: #f1f5f9;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.8125rem;
+        color: #334155;
+        white-space: nowrap;
+    }
+
+    .formulario {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: 16px;
+        margin-top: 4px;
+        padding-top: 24px;
+        border-top: 1px solid var(--borde-suave);
+    }
+
+    .campo-archivo {
+        flex: 1 1 320px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .campo-archivo-titulo {
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--texto-suave);
+    }
+
+    .campo-archivo input[type="file"] {
+        width: 100%;
+        max-width: 100%;
+        padding: 13px;
+        border: 1px dashed #b6c2d1;
+        border-radius: var(--radio-pequeno);
+        background-color: #fbfcfd;
+        font: inherit;
+        font-size: 0.9375rem;
+        color: var(--texto);
+        cursor: pointer;
+    }
+
+    .campo-archivo input[type="file"]:hover {
+        border-color: #8fa3ba;
+        background-color: #f7fafc;
+    }
+
+    .campo-archivo input[type="file"]:focus-visible {
+        outline: 2px solid var(--foco);
+        outline-offset: 2px;
+        border-color: var(--acento);
+    }
+
+    .campo-archivo input[type="file"]::file-selector-button {
+        margin-right: 12px;
+        padding: 7px 13px;
+        border: 1px solid var(--borde);
+        border-radius: 6px;
+        background-color: #eef2f7;
+        font: inherit;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #33475b;
+        cursor: pointer;
+    }
+
+    .campo-archivo input[type="file"]::file-selector-button:hover {
+        background-color: #e2e8f0;
+    }
+
+    .campo-ayuda {
+        font-size: 0.8125rem;
+        line-height: 1.5;
+        color: var(--texto-suave);
+    }
+
+    .boton {
+        flex: 0 0 auto;
+        padding: 12px 30px;
+        border: 1px solid var(--acento);
+        border-radius: var(--radio-pequeno);
+        background-color: var(--acento);
+        font: inherit;
+        font-size: 0.9375rem;
+        font-weight: 600;
+        line-height: 1.4;
+        color: #ffffff;
+        cursor: pointer;
+    }
+
+    .boton:hover {
+        background-color: var(--acento-fuerte);
+        border-color: var(--acento-fuerte);
+    }
+
+    .boton:active {
+        background-color: #102a48;
+        border-color: #102a48;
+    }
+
+    .boton:focus-visible {
+        outline: 2px solid var(--foco);
+        outline-offset: 2px;
+    }
+
+    .ayuda {
+        margin-top: 22px;
+        padding-left: 12px;
+        border-left: 3px solid var(--borde);
+        font-size: 0.875rem;
+        line-height: 1.6;
+        color: var(--texto-suave);
+    }
+
+    .ayuda strong {
+        color: var(--texto);
+    }
+
+    @media (max-width: 640px) {
+        .panel {
+            padding: 20px;
+        }
+
+        .formulario {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .boton {
+            width: 100%;
+        }
+    }
+{% endblock %}
+
+{% block contenido %}
+<section class="panel">
+    <h2 class="panel-titulo">Cargar movimientos</h2>
+    <p class="panel-texto">
+        Suba el archivo de Excel de la jornada. La aplicación leerá los documentos
+        <strong>EO</strong> (entrada por transformación) y <strong>SO</strong>
+        (salida por transformación), armará los cruces entre cada entrada y su salida
+        y comparará sus costos. Los demás tipos de documento no se procesan.
+    </p>
+
+    <ul class="requisitos">
+        <li>Solo se acepta el formato <span class="codigo">.xlsx</span>.</li>
+        <li>Una sola hoja de movimientos en la primera posición del archivo.</li>
+        <li>
+            Las 14 columnas del archivo de movimientos:
+            <span class="codigo">Fecha</span>,
+            <span class="codigo">Bodega</span>,
+            <span class="codigo">Tipo Doc.</span>,
+            <span class="codigo">Descripción Documento</span>,
+            <span class="codigo">No. Documento</span>,
+            <span class="codigo">No. Físico</span>,
+            <span class="codigo">No. Artículo</span>,
+            <span class="codigo">Descripción Artículo</span>,
+            <span class="codigo">Cantidad</span>,
+            <span class="codigo">Unidad Med.</span>,
+            <span class="codigo">Kilos</span>,
+            <span class="codigo">Costo Uni.</span>,
+            <span class="codigo">Total</span> y
+            <span class="codigo">Usuario Aplica</span>.
+        </li>
+    </ul>
+
+    <form class="formulario" method="post" action="/cargar" enctype="multipart/form-data">
+        <div class="campo-archivo">
+            <label class="campo-archivo-titulo" for="archivo">Archivo de movimientos</label>
+            <input
+                id="archivo"
+                name="archivo"
+                type="file"
+                accept=".xlsx"
+                aria-describedby="ayuda-archivo"
+                required
+            >
+            <p class="campo-ayuda" id="ayuda-archivo">
+                Elija el archivo y pulse «Analizar».
+            </p>
+        </div>
+        <button class="boton" type="submit">Analizar</button>
+    </form>
+
+    <p class="ayuda">
+        El archivo no se modifica: se lee y se procesa sin alterar el original.
+        Los registros dudosos se marcan como <strong>Revisar</strong> para que usted
+        los revise antes de tomar una decisión.
+    </p>
+</section>
+{% endblock %}
