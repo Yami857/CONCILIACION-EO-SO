@@ -9,7 +9,8 @@ Validación de la entrega **T4** del `PLAN.md`: contraste de las **cifras de con
 | Archivo usado | `INSUMOS/MOVIMIENTOS 4-11-26.xlsx` (4.898 filas, 14 columnas, hoja `Movimientos por Tipo Documento `) |
 | Archivo de prueba complementario | `tests/fixtures/movimientos_prueba.xlsx` (10 filas, 14 columnas) |
 | Comando ejecutado | `uv run pytest -q` |
-| Resultado de pytest | **116 pruebas aprobadas, 0 fallidas** (2,57 s). Salida completa en `tests/_salida_pytest_t4.txt` |
+| Resultado de pytest | **129 pruebas aprobadas, 0 fallidas** (7,41 s). Salida completa en `tests/_salida_pytest_acceso.txt` (la corrida histórica de T4, con 116 pruebas, quedó en `tests/_salida_pytest_t4.txt`) |
+| Acceso (login) | Todas las rutas exigen sesión (`APP_USUARIO` / `APP_CLAVE` del entorno). Las 116 pruebas anteriores ahora usan un cliente con sesión iniciada y se agregaron 13 pruebas de acceso en `tests/test_acceso.py` |
 | Método de obtención | Los valores se leyeron de la app real: `POST /cargar` + `GET /resultados` con el cliente de Flask, y del HTML renderizado (tarjetas, contadores y semáforos), además de los services R1–R7 |
 | Responsable de la validación | `@tester` (entrega 16) |
 | Alteraciones al código de la app | Ninguna (no se modificó `app/`, `wsgi.py`, `iniciar_app.bat` ni las pruebas existentes) |
@@ -100,6 +101,8 @@ Los siete contadores, en orden de la pantalla: **Registros EO/SO** 183 · **Cruc
 | 15 | Sin `OPENROUTER_API_KEY` en `.env` | No se llama al proveedor; todo `"no indicado"`; la app sigue funcionando | Motivo `falta_llave`, 0 peticiones de red, los 89 cruces en `"no indicado"`, aviso en pantalla, cifras intactas | `test_caso_sin_llave_el_agente_no_consulta_y_todo_queda_no_indicado` + verificación manual descrita en la sección e | OK |
 | 16 | Ningún caso produce error 500 | Solo respuestas 200/302; `"Revisar"` donde corresponde; sin excepciones | 14 variantes (9 válidas y 5 inválidas) sin 500; en las válidas la descarga responde 200 con `Content-Type` de Excel; en las inválidas redirige con "Revisar" | `test_caso_ningun_archivo_produce_error_500[...]` (14 parametrizaciones) | OK |
 | 17 | `Cantidad`, `Kilos`, `Costo Uni.` o `Total` no numéricos, o `Fecha` inválida | `"Revisar"`; el valor inválido no se convierte en 0 en silencio | Los cinco campos se validan con el dato crudo de la línea: `Total`, `Cantidad`, `Costo Uni.` y `Kilos` de texto y `Fecha` inválida dejan el cruce en `"Revisar"`; `"Revisar"` no anula `costo_eo_mayor` (sigue `true`) ni el semáforo rojo; solo se marca el cruce que trae el dato inválido | `test_r6_total_no_numerico_marca_revisar`, `test_r6_cantidad_no_numerica_marca_revisar`, `test_r6_costo_unitario_no_numerico_marca_revisar_sin_anular_el_costo`, `test_r6_kilos_no_numerico_marca_revisar_sin_anular_el_costo`, `test_r6_fecha_invalida_marca_revisar[N/A]`, `[...][31/02/2026]`, `[...][20261104]`, `test_r6_valores_invalidos_solo_afectan_al_cruce_que_los_trae` | OK |
+| 18 | Acceso: sin sesión, cualquier pantalla (no es un caso de §8; es la regla de acceso del login) | 302 a `/login`; no se ve la conciliación ni se descarga el reporte | `/`, `/resultados`, `/descargar` y `POST /cargar` responden 302 con `Location` = `/login` y no se crea sesión | `test_acceso_sin_sesion_la_pantalla_principal_redirige_a_login`, `test_acceso_sin_sesion_toda_ruta_protegida_redirige_a_login[GET/POST ...]` (4 parametrizaciones) | OK |
+| 19 | Acceso: ingreso con credenciales | Con usuario y clave correctos entra a `/`; con cualquiera incorrecta se queda en `/login` con «Usuario o contraseña incorrectos» y sin sesión; sin `APP_USUARIO`/`APP_CLAVE` avisa «El acceso no está configurado en el servidor.»; `/salir` cierra la sesión; la cabecera muestra el email y «Salir» solo con sesión | Todo lo anterior se cumple: 302 a `/` con credenciales buenas y luego `GET /` 200; 200 con el mensaje exacto y `GET /` 302 cuando la clave o el usuario no coinciden; 200 con el aviso de servidor sin configurar y sin sesión; `/salir` → 302 a `/login` y después `/` → 302 (también sin sesión, sin error) | `test_acceso_login_muestra_usuario_contrasena_y_boton_entrar`, `test_acceso_login_con_clave_incorrecta_no_entra_y_avisa`, `test_acceso_login_con_usuario_incorrecto_no_entra_y_avisa`, `test_acceso_login_con_credenciales_correctas_entra_a_la_pantalla_principal`, `test_acceso_sin_variables_el_login_avisa_que_no_esta_configurado`, `test_acceso_salir_con_sesion_cierra_la_sesion`, `test_acceso_salir_sin_sesion_redirige_a_login_sin_fallar`, `test_acceso_la_cabecera_muestra_usuario_y_salir_solo_con_sesion` | OK |
 
 ---
 
@@ -107,7 +110,7 @@ Los siete contadores, en orden de la pantalla: **Registros EO/SO** 183 · **Cruc
 
 **0 diferencias.**
 
-Las 25 cifras de control de `AGENTS.md` §7 y los 17 casos límite verificados coinciden exactamente con lo que devuelve la aplicación sobre `INSUMOS/MOVIMIENTOS 4-11-26.xlsx`. No se cambió ningún esperado, ninguna tolerancia ni ningún dato de entrada para que las pruebas pasaran, y no se usó `skip` ni `xfail`.
+Las 25 cifras de control de `AGENTS.md` §7 y los 19 casos verificados (17 de §8 más los 2 del acceso) coinciden exactamente con lo que devuelve la aplicación sobre `INSUMOS/MOVIMIENTOS 4-11-26.xlsx`. No se cambió ningún esperado, ninguna tolerancia ni ningún dato de entrada para que las pruebas pasaran, y no se usó `skip` ni `xfail`.
 
 ---
 
@@ -123,7 +126,8 @@ Las 25 cifras de control de `AGENTS.md` §7 y los 17 casos límite verificados c
 8. **Tildes en la consola de Windows.** Al ejecutar `pytest` desde PowerShell algunos acentos se ven mal en la consola (codificación de la terminal); el HTML de la app, los mensajes y los archivos son UTF-8 y en pantalla se ven correctos. No es un defecto de la app.
 9. **`/resultados` recalcula todo en cada visita** (R1 a R7) sobre la copia del Excel guardada en `instance/subidas`; no guarda resultados entre visitas. Es coherente con el alcance de "un archivo por lote".
 10. **El archivo de prueba vive en `tests/`**, no en `INSUMOS/` (esa carpeta es de solo lectura y no contiene `movimientos_prueba.xlsx`). Tiene 10 filas, 14 columnas, mezcla EO/SO con `SO = EO − 1`, un cruce con `Total` de la EO muy superior al de la SO y un cruce con dato incompleto que fuerza `"Revisar"`.
-11. **`INSUMOS/` no se versiona** (está en `.gitignore`), así que un clon del repositorio no trae `MOVIMIENTOS 4-11-26.xlsx`. Para reproducir las cifras de control hay que definir la variable de entorno `CONCILIADOR_INSUMO` con la ruta al `.xlsx`, o colocar `MOVIMIENTOS 4-11-26.xlsx` en `INSUMOS/` en la raíz del proyecto. `tests/conftest.py` resuelve la ruta en ese orden; si el archivo no existe, las pruebas que dependen del insumo real (las de cifras de control entre ellas) se **omiten** con el mensaje "Falta el insumo real: defina CONCILIADOR_INSUMO o coloque MOVIMIENTOS 4-11-26.xlsx en INSUMOS/ (no se versiona).". La omisión es solo por ausencia de ese dato externo, no para esconder fallos: con el archivo presente corren las 116 pruebas y cualquier diferencia con `AGENTS.md` falla. Las pruebas que usan `tests/fixtures/movimientos_prueba.xlsx` (los 41 de `test_casos_limite.py`) corren siempre. En esta máquina, con el archivo real presente, el resultado sigue siendo **116 aprobadas, 0 omitidas, 0 fallidas**.
+11. **`INSUMOS/` no se versiona** (está en `.gitignore`), así que un clon del repositorio no trae `MOVIMIENTOS 4-11-26.xlsx`. Para reproducir las cifras de control hay que definir la variable de entorno `CONCILIADOR_INSUMO` con la ruta al `.xlsx`, o colocar `MOVIMIENTOS 4-11-26.xlsx` en `INSUMOS/` en la raíz del proyecto. `tests/conftest.py` resuelve la ruta en ese orden; si el archivo no existe, las pruebas que dependen del insumo real (las de cifras de control entre ellas) se **omiten** con el mensaje "Falta el insumo real: defina CONCILIADOR_INSUMO o coloque MOVIMIENTOS 4-11-26.xlsx en INSUMOS/ (no se versiona).". La omisión es solo por ausencia de ese dato externo, no para esconder fallos: con el archivo presente corren las 129 pruebas y cualquier diferencia con `AGENTS.md` falla. Las pruebas que usan `tests/fixtures/movimientos_prueba.xlsx` (los 41 de `test_casos_limite.py`) y las del acceso (los 13 de `test_acceso.py`) corren siempre. En esta máquina, con el archivo real presente, el resultado sigue siendo **129 aprobadas, 0 omitidas, 0 fallidas**.
+12. **Acceso con usuario y contraseña.** Desde que se agregó el login, todas las rutas exigen sesión y redirigen a `/login` (302) si no la hay. Las credenciales se leen de `APP_USUARIO` y `APP_CLAVE` del entorno (`.env`), nunca del código. `tests/conftest.py` fija esas dos variables con valores de prueba (`prueba@montecillos.com` / `clave-de-prueba-2026`) antes de crear la app, así que la suite no depende del `.env` local, y entrega el fixture `cliente` **con sesión iniciada**: las 116 pruebas anteriores siguen comprobando exactamente lo mismo y ya no reciben el 302 a `/login`. El caso «servidor sin configurar» se prueba con el fixture `cliente_sin_credenciales`, que borra esas variables solo durante esa prueba.
 
 ---
 
@@ -135,17 +139,17 @@ Las 25 cifras de control de `AGENTS.md` §7 y los 17 casos límite verificados c
 uv run pytest -q
 ```
 
-Resultado esperado (y observado el 2026-11-04):
+Resultado esperado (y observado el 2026-11-11, con el login ya integrado):
 
 ```
-........................................................................ [ 62%]
-............................................                             [100%]
-116 passed in 2.57s
+........................................................................ [ 55%]
+.........................................................                [100%]
+129 passed in 7.41s
 ```
 
-- 116 pruebas: `test_r1_carga.py` 9 · `test_r2_filtro.py` 4 · `test_r3_emparejamiento.py` 6 · `test_r4_agrupacion.py` 10 · `test_r5_costos.py` 9 · `test_r6_revisar.py` 24 · `test_cifras_control.py` 13 · `test_casos_limite.py` 41.
+- 129 pruebas: `test_acceso.py` 13 · `test_r1_carga.py` 9 · `test_r2_filtro.py` 4 · `test_r3_emparejamiento.py` 6 · `test_r4_agrupacion.py` 10 · `test_r5_costos.py` 9 · `test_r6_revisar.py` 24 · `test_cifras_control.py` 13 · `test_casos_limite.py` 41.
 - Cualquier `F` o `E` en esa salida es un hallazgo: no se debe ajustar el esperado ni el dato de entrada.
-- La salida completa de esta validación está guardada en `tests/_salida_pytest_t4.txt`.
+- La salida completa de esta validación está guardada en `tests/_salida_pytest_acceso.txt` (la corrida anterior a la del login, con 116 pruebas, está en `tests/_salida_pytest_t4.txt`).
 
 Para ver solo las cifras de control:
 
@@ -153,25 +157,33 @@ Para ver solo las cifras de control:
 uv run pytest -q tests/test_cifras_control.py
 ```
 
+Para ver solo el acceso:
+
+```bash
+uv run pytest -q tests/test_acceso.py
+```
+
 ### En pantalla
 
-1. Doble clic en `iniciar_app.bat` en la raíz del proyecto. Se abre el navegador en `http://127.0.0.1:5000` con el título **"Conciliador EO / SO"** y sin error 500.
-2. En "Cargar archivo de movimientos", seleccionar `INSUMOS/MOVIMIENTOS 4-11-26.xlsx` y pulsar **"Analizar"**.
-3. Debe aparecer el mensaje **"4.898 filas y 14 columnas cargadas desde la hoja «Movimientos por Tipo Documento»."**
-4. En **"Cifras de control"** deben verse las tres tarjetas: **272.865,75** (diferencia global), **341.738,47** (cifra principal, diferencias donde la EO supera a la SO) y **49.829,07** (diferencias de costo unitario).
-5. En **"Contadores del archivo"**: **183** registros EO/SO (94 EO y 89 SO), **89** cruces, **50** alertas de costo, **0** en revisar, **89** correctos, **89** entradas y **0** sin pareja.
-6. En **"Semáforos"**: **50 rojos / 39 verdes**.
-7. En la tabla de cruces: **89 filas**. Al escribir `Revisar` en el filtro de estado deben quedar **0 filas**; al borrarlo vuelven las 89.
-8. Clic en la fila del cruce **EO-1615096-SO-1615095**: el detalle debe mostrar Total EO **23.978,17**, Total SO **13.383,80** y diferencia **10.594,37** (semáforo rojo, estado `Correcto`).
-9. Botón **"Descargar reporte"**: se obtiene un `.xlsx` con **183 filas y 18 columnas** (las 14 originales más `Cruce EO-SO`, `Diferencia de Costo`, `Análisis IA` y `Estado de Revisión`).
-10. Sin `OPENROUTER_API_KEY` en `.env`, arriba de las cifras se ve la banda de aviso "Análisis IA no disponible… Se muestra «no indicado»" y la columna de análisis dice `no indicado` en todos los cruces, **sin que cambien las cifras ni los semáforos**.
+1. Doble clic en `iniciar_app.bat` en la raíz del proyecto. Se abre el navegador en `http://127.0.0.1:5000`; como no hay sesión, la app muestra la pantalla **Ingresar** (o redirige a `http://127.0.0.1:5000/login`) con el título **"Conciliador EO / SO"**, sin error 500.
+2. Escribir en **Usuario** y **Contraseña** los valores de `APP_USUARIO` y `APP_CLAVE` del `.env` y pulsar **"Entrar"**: se abre la pantalla principal y en la cabecera, a la derecha, aparecen el email y el enlace **"Salir"**. Con una clave equivocada se queda en `/login` con el mensaje **"Usuario o contraseña incorrectos"**.
+3. En "Cargar archivo de movimientos", seleccionar `INSUMOS/MOVIMIENTOS 4-11-26.xlsx` y pulsar **"Analizar"**.
+4. Debe aparecer el mensaje **"4.898 filas y 14 columnas cargadas desde la hoja «Movimientos por Tipo Documento»."**
+5. En **"Cifras de control"** deben verse las tres tarjetas: **272.865,75** (diferencia global), **341.738,47** (cifra principal, diferencias donde la EO supera a la SO) y **49.829,07** (diferencias de costo unitario).
+6. En **"Contadores del archivo"**: **183** registros EO/SO (94 EO y 89 SO), **89** cruces, **50** alertas de costo, **0** en revisar, **89** correctos, **89** entradas y **0** sin pareja.
+7. En **"Semáforos"**: **50 rojos / 39 verdes**.
+8. En la tabla de cruces: **89 filas**. Al escribir `Revisar` en el filtro de estado deben quedar **0 filas**; al borrarlo vuelven las 89.
+9. Clic en la fila del cruce **EO-1615096-SO-1615095**: el detalle debe mostrar Total EO **23.978,17**, Total SO **13.383,80** y diferencia **10.594,37** (semáforo rojo, estado `Correcto`).
+10. Botón **"Descargar reporte"**: se obtiene un `.xlsx` con **183 filas y 18 columnas** (las 14 originales más `Cruce EO-SO`, `Diferencia de Costo`, `Análisis IA` y `Estado de Revisión`).
+11. Sin `OPENROUTER_API_KEY` en `.env`, arriba de las cifras se ve la banda de aviso "Análisis IA no disponible… Se muestra «no indicado»" y la columna de análisis dice `no indicado` en todos los cruces, **sin que cambien las cifras ni los semáforos**.
+12. Clic en **"Salir"**: vuelve a la pantalla de ingreso y, al entrar de nuevo a `http://127.0.0.1:5000/`, la app pide las credenciales otra vez.
 
 ---
 
 ## Resumen
 
 - Archivo de este reporte: `tests/VALIDACION.md`
-- Pruebas ejecutadas: **116** · aprobadas: **116** · fallidas: **0** (`uv run pytest -q`, 2,57 s)
+- Pruebas ejecutadas: **129** · aprobadas: **129** · fallidas: **0** (`uv run pytest -q`, 7,41 s)
 - Cifras de control verificadas: **25 de 25 OK**
-- Casos límite verificados: **17 de 17 OK**
+- Casos verificados: **19 de 19 OK** (17 de `AGENTS.md` §8 + 2 del acceso)
 - **0 diferencias**

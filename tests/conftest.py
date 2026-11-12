@@ -14,6 +14,13 @@ de entorno `CONCILIADOR_INSUMO` si está definida; si no, se usa
 lo necesitan hacen `pytest.skip` (SOLO por ausencia de este dato externo, nunca
 para esconder un fallo de la app). Las pruebas que usan
 `tests/fixtures/movimientos_prueba.xlsx` corren siempre.
+
+Acceso (login): todas las rutas exigen sesión (`app/controllers/acceso.py`). El
+fixture `cliente` entrega el cliente de Flask **con la sesión ya iniciada** y la
+fixture autouse de sesión `entorno_de_acceso` fija `APP_USUARIO` y `APP_CLAVE`
+con valores de prueba antes de crear la app, de modo que la suite no depende del
+`.env` local. `cliente_anonimo` es el mismo cliente sin sesión, para las pruebas
+del ingreso.
 """
 
 import os
@@ -131,9 +138,70 @@ def pipeline_real(registros):
     }
 
 
+# --- Acceso (login) ---------------------------------------------------------
+#
+# La app exige sesión en todas las pantallas (`app/controllers/acceso.py`): sin
+# `session["usuario"]` cualquier ruta responde 302 a `/login`. Las credenciales
+# se leen de `APP_USUARIO` y `APP_CLAVE`, así que las pruebas definen valores
+# propios ANTES de crear la app: el resultado no depende del `.env` local.
+USUARIO_PRUEBA = "prueba@montecillos.com"
+CLAVE_PRUEBA = "clave-de-prueba-2026"
+
+
+@pytest.fixture(scope="session", autouse=True)
+def entorno_de_acceso():
+    """Fija `APP_USUARIO` y `APP_CLAVE` para toda la sesión de pytest.
+
+    `create_app()` no sobrescribe variables ya presentes en el entorno (ver
+    `cargar_variables_entorno`), de modo que estos valores ganan al `.env`. La
+    fixture es autouse y de sesión para que existan antes de crear cualquier
+    app. Las pruebas que necesitan el caso «sin configurar» borran estas
+    variables con `monkeypatch` dentro de su propia prueba.
+    """
+    gestor = pytest.MonkeyPatch()
+    gestor.setenv("APP_USUARIO", USUARIO_PRUEBA)
+    gestor.setenv("APP_CLAVE", CLAVE_PRUEBA)
+    yield USUARIO_PRUEBA, CLAVE_PRUEBA
+    gestor.undo()
+
+
+def iniciar_sesion(cliente, usuario=USUARIO_PRUEBA):
+    """Deja una sesión iniciada en el cliente de pruebas y lo devuelve.
+
+    Recibe: `cliente` (Flask test client) y `usuario` (por defecto el de
+    prueba). Devuelve el mismo cliente con `session["usuario"]` puesto, sin
+    pasar por el formulario de `/login`.
+    """
+    with cliente.session_transaction() as sesion:
+        sesion["usuario"] = usuario
+    return cliente
+
+
 @pytest.fixture()
-def cliente(tmp_path_factory):
-    """Cliente de pruebas de Flask, con la app creada por `create_app()`."""
-    app = create_app(instance_path=str(tmp_path_factory.mktemp("instancia")))
-    app.config.update(TESTING=True)
+def app(tmp_path_factory):
+    """Aplicación Flask de pruebas, creada con `create_app()`.
+
+    Usa una carpeta de instancia temporal para no ensuciar `instance/` del
+    proyecto (AGENTS.md §9).
+    """
+    aplicacion = create_app(instance_path=str(tmp_path_factory.mktemp("instancia")))
+    aplicacion.config.update(TESTING=True)
+    return aplicacion
+
+
+@pytest.fixture()
+def cliente_anonimo(app):
+    """Cliente de pruebas SIN sesión iniciada (para probar el login)."""
     return app.test_client()
+
+
+@pytest.fixture()
+def cliente(app):
+    """Cliente de pruebas con SESIÓN INICIADA.
+
+    Todas las rutas exigen sesión desde que se agregó el login, así que este
+    fixture entra con `session["usuario"]` ya puesto. Las pruebas existentes
+    siguen comprobando exactamente lo mismo que antes (formulario, cifras,
+    descargas) y dejan de recibir el 302 a `/login`.
+    """
+    return iniciar_sesion(app.test_client())

@@ -73,11 +73,15 @@ def create_app(instance_path=None):
     purgar_antiguos(app.instance_path)
 
     # Registro de blueprints de app/controllers.
+    from app.controllers.acceso import bp_acceso
     from app.controllers.carga import bp_carga
     from app.controllers.descarga import bp_descarga
     from app.controllers.main import bp_main
     from app.controllers.resultados import bp_resultados
 
+    # El blueprint de acceso va primero: su `before_app_request` es la única
+    # puerta de entrada de las demás pantallas.
+    app.register_blueprint(bp_acceso)
     app.register_blueprint(bp_main)
     app.register_blueprint(bp_carga)
     app.register_blueprint(bp_resultados)

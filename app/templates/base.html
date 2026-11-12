@@ -114,6 +114,7 @@
         .cabecera-interna {
             display: flex;
             align-items: center;
+            flex-wrap: wrap;
             gap: 16px;
             padding-top: 18px;
             padding-bottom: 18px;
@@ -145,6 +146,32 @@
             margin-top: 3px;
             font-size: 0.875rem;
             color: var(--texto-suave);
+        }
+
+        /* Usuaria en sesión: email y salida discreta, a la derecha. */
+        .marca-usuario {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-left: auto;
+            min-width: 0;
+        }
+
+        .marca-usuario-email {
+            font-size: 0.875rem;
+            line-height: 1.4;
+            color: var(--texto-suave);
+            min-width: 0;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .marca-usuario .boton-enlace {
+            flex: 0 0 auto;
+            padding: 8px 16px;
+            font-size: 0.875rem;
         }
 
         /* ===== Contenido ===== */
@@ -356,6 +383,13 @@
                 font-size: 0.8125rem;
             }
 
+            .marca-usuario {
+                width: 100%;
+                flex-wrap: wrap;
+                justify-content: space-between;
+                margin-left: 0;
+            }
+
             .principal {
                 padding-top: 24px;
                 padding-bottom: 36px;
@@ -395,6 +429,13 @@
                     señala las diferencias de costo.
                 </p>
             </div>
+            {% if session.get('usuario') %}
+                <div class="marca-usuario">
+                    <span class="marca-usuario-email">{{ session.get('usuario') }}</span>
+                    <a class="boton-enlace boton-enlace--secundario"
+                       href="{{ url_for('acceso.salir') }}">Salir</a>
+                </div>
+            {% endif %}
         </div>
     </header>
 

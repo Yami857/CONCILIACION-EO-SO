@@ -25,3 +25,8 @@ services:
         sync: false
       - key: OPENROUTER_MODEL
         value: google/gemma-4-31b-it:free
+      # Credenciales de acceso: se piden en el panel, nunca van en el repositorio.
+      - key: APP_USUARIO
+        sync: false
+      - key: APP_CLAVE
+        sync: false

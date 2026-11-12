@@ -35,7 +35,26 @@ Se leen de `.env` (nunca se versiona) o del entorno del sistema. Ver `.env.examp
 | `OPENROUTER_API_KEY` | Llave del agente de IA. Sin llave la app funciona y el análisis dice `no indicado`. |
 | `OPENROUTER_MODEL` | Modelo de OpenRouter (por defecto `google/gemma-4-31b-it:free`). |
 | `SECRET_KEY` | Clave de las sesiones de Flask. |
+| `APP_USUARIO` | Usuario del ingreso (un email). |
+| `APP_CLAVE` | Contraseña del ingreso. |
 | `CONCILIADOR_INSUMO` | Ruta al Excel real para las pruebas (opcional). |
+
+## Acceso
+
+La app pide usuario y contraseña antes de mostrar cualquier pantalla; no hay base de
+datos de usuarios. Las dos credenciales se leen del entorno:
+
+| Variable | Contenido |
+|---|---|
+| `APP_USUARIO` | El email de la persona que usa la app. |
+| `APP_CLAVE` | Su contraseña. |
+
+- En local se escriben en `.env` (nunca se versiona). En **Render** se configuran en el
+  panel del servicio: **Environment** → **Add Environment Variable**, con esos dos nombres.
+- Si alguna de las dos falta o queda vacía, **no se puede entrar**: el formulario muestra
+  «El acceso no está configurado en el servidor.».
+- Al entrar, la pantalla principal muestra el email en la cabecera y el enlace
+  **Salir**, que cierra la sesión.
 
 ## Pruebas
 
@@ -83,6 +102,8 @@ Y en **Environment**:
 | `SECRET_KEY` | Generar uno: `python -c "import secrets; print(secrets.token_hex(32))"` |
 | `OPENROUTER_API_KEY` | Tu llave de OpenRouter (opcional) |
 | `OPENROUTER_MODEL` | `google/gemma-4-31b-it:free` |
+| `APP_USUARIO` | El email del ingreso |
+| `APP_CLAVE` | La contraseña del ingreso |
 
 ### Notas de producción
 
