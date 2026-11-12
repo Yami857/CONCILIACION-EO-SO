@@ -56,6 +56,17 @@ def create_app(instance_path=None):
     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
     app.config["JSON_AS_ASCII"] = False
 
+    # En Render (`RENDER=true`, siempre HTTPS detrás de su proxy) la cookie de
+    # sesión se envía solo por HTTPS y no es accesible desde JavaScript. En local
+    # no se activa nada de esto, para no romper http://127.0.0.1:5000.
+    if os.environ.get("RENDER"):
+        app.config.update(
+            SESSION_COOKIE_SECURE=True,
+            SESSION_COOKIE_HTTPONLY=True,
+            SESSION_COOKIE_SAMESITE="Lax",
+            PREFERRED_URL_SCHEME="https",
+        )
+
     # Retención de datos reales: se purgan los archivos temporales de más de 24
     # horas sobre `app.instance_path`. El service crea `subidas` y `salidas` si
     # no existen; si falla, no tumba el arranque.

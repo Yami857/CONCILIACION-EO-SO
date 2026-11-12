@@ -1,0 +1,26 @@
+# Blueprint de Render para el Conciliador EO / SO.
+# Con este archivo, Render crea el servicio web con la configuración correcta
+# sin escribirlas a mano: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: conciliacion-eo-so
+    runtime: python
+    plan: free
+    region: oregon
+    branch: main
+    autoDeployTrigger: commit
+    # uv ya viene instalado en Render cuando el repositorio tiene uv.lock.
+    buildCommand: uv sync --frozen --no-dev
+    # El análisis de IA de los 89 cruces puede tardar; el timeout por defecto de
+    # gunicorn (30 s) cortaría la petición. Se sube a 180 s.
+    startCommand: uv run --frozen --no-dev gunicorn wsgi:app --bind 0.0.0.0:${PORT:-10000} --workers 2 --threads 4 --timeout 180 --access-logfile - --error-logfile -
+    healthCheckPath: /
+    envVars:
+      # Clave de las sesiones de Flask: Render la genera y la guarda.
+      - key: SECRET_KEY
+        generateValue: true
+      # Se pide en el panel de Render; nunca se escribe en el repositorio.
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_MODEL
+        value: google/gemma-4-31b-it:free
