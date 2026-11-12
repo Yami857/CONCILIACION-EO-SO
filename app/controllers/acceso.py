@@ -21,9 +21,13 @@ from flask import (
 
 bp_acceso = Blueprint("acceso", __name__)
 
-# Mensajes exactos de la pantalla de ingreso (en español, sin datos internos).
+# Mensaje exacto de la pantalla de ingreso (en español, sin datos internos).
 MENSAJE_CREDENCIALES = "Usuario o contraseña incorrectos"
 MENSAJE_SIN_CONFIGURAR = "El acceso no está configurado en el servidor."
+
+# Variables de entorno que deben existir para poder entrar.
+VARIABLE_USUARIO = "APP_USUARIO"
+VARIABLE_CLAVE = "APP_CLAVE"
 
 # Endpoints que se pueden usar sin sesión: el formulario y la salida.
 ENDPOINTS_LIBRES = ("acceso.login", "acceso.salir")
@@ -37,9 +41,34 @@ def _credenciales_configuradas():
     devuelve cadenas vacías y la app no permite entrar (no hay usuario por
     defecto). No registra ni muestra los valores.
     """
-    usuario = os.environ.get("APP_USUARIO") or ""
-    clave = os.environ.get("APP_CLAVE") or ""
+    usuario = os.environ.get(VARIABLE_USUARIO) or ""
+    clave = os.environ.get(VARIABLE_CLAVE) or ""
     return usuario, clave
+
+
+def _mensaje_sin_configurar(usuario, clave):
+    """Arma el aviso de configuración incompleta indicando qué variable falta.
+
+    Recibe: `usuario` y `clave` leídos del entorno (pueden venir vacíos).
+    Devuelve: el texto que se muestra en el formulario. Se nombran solo las
+    variables que faltan, nunca sus valores, para que el problema se vea en
+    pantalla sin abrir los registros del servidor.
+    """
+    faltan = []
+    if not usuario.strip():
+        faltan.append(VARIABLE_USUARIO)
+    if not clave.strip():
+        faltan.append(VARIABLE_CLAVE)
+    return f"{MENSAJE_SIN_CONFIGURAR} Falta configurar: {', '.join(faltan)}."
+
+
+def _configurada(usuario, clave):
+    """Indica si las dos credenciales están presentes en el entorno.
+
+    Recibe: `usuario` y `clave` leídos del entorno.
+    Devuelve: `True` solo si ambas tienen contenido.
+    """
+    return bool(usuario.strip()) and bool(clave.strip())
 
 
 def _coincide(valor_ingresado, valor_configurado):
@@ -90,17 +119,25 @@ def login():
     "El acceso no está configurado en el servidor."
     """
     if request.method == "GET":
-        return render_template("login.html", usuario="", error=None)
+        usuario_configurado, clave_configurada = _credenciales_configuradas()
+        aviso = None
+        if not _configurada(usuario_configurado, clave_configurada):
+            # Se avisa desde la primera pantalla: sin variables no hay forma de
+            # entrar y conviene verlo antes de escribir la contraseña.
+            aviso = _mensaje_sin_configurar(usuario_configurado, clave_configurada)
+        return render_template("login.html", usuario="", error=aviso)
 
     usuario_ingresado = request.form.get("usuario") or ""
     clave_ingresada = request.form.get("clave") or ""
 
     usuario_configurado, clave_configurada = _credenciales_configuradas()
-    if not usuario_configurado.strip() or not clave_configurada.strip():
+    if not _configurada(usuario_configurado, clave_configurada):
         # Sin credenciales en el servidor no se permite ningún intento.
         return (
             render_template(
-                "login.html", usuario=usuario_ingresado, error=MENSAJE_SIN_CONFIGURAR
+                "login.html",
+                usuario=usuario_ingresado,
+                error=_mensaje_sin_configurar(usuario_configurado, clave_configurada),
             ),
             200,
         )
