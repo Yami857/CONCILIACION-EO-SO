@@ -72,7 +72,7 @@ El repositorio incluye `render.yaml` (Blueprint), `.python-version` (Python 3.12
 | Language | `Python 3` |
 | Branch | `main` |
 | Build Command | `uv sync --frozen --no-dev` |
-| Start Command | `uv run --frozen --no-dev gunicorn wsgi:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 180 --access-logfile - --error-logfile -` |
+| Start Command | `uv run --frozen --no-dev gunicorn wsgi:app --bind 0.0.0.0:$PORT --workers 1 --threads 8 --timeout 180 --access-logfile - --error-logfile -` |
 | Health Check Path | `/` |
 | Plan | `Free` |
 
@@ -86,6 +86,8 @@ Y en **Environment**:
 
 ### Notas de producción
 
+- Un solo **proceso** de gunicorn con 8 hilos: el plan Free tiene 512 MB de memoria y así
+  no se duplica el Excel en memoria al procesarlo.
 - El **timeout de gunicorn se sube a 180 s** porque el análisis de IA de los 89 cruces
   puede tardar más que los 30 s por defecto.
 - En Render el disco es **efímero**: los archivos subidos se pierden al redesplegar o

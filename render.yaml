@@ -11,9 +11,10 @@ services:
     autoDeployTrigger: commit
     # uv ya viene instalado en Render cuando el repositorio tiene uv.lock.
     buildCommand: uv sync --frozen --no-dev
-    # El análisis de IA de los 89 cruces puede tardar; el timeout por defecto de
-    # gunicorn (30 s) cortaría la petición. Se sube a 180 s.
-    startCommand: uv run --frozen --no-dev gunicorn wsgi:app --bind 0.0.0.0:${PORT:-10000} --workers 2 --threads 4 --timeout 180 --access-logfile - --error-logfile -
+    # Un solo proceso con hilos: el plan Free tiene 512 MB y así no se duplica el
+    # Excel en memoria. El análisis de IA de los 89 cruces puede tardar más que
+    # los 30 s por defecto de gunicorn, por eso el timeout sube a 180 s.
+    startCommand: uv run --frozen --no-dev gunicorn wsgi:app --bind 0.0.0.0:${PORT:-10000} --workers 1 --threads 8 --timeout 180 --access-logfile - --error-logfile -
     healthCheckPath: /
     envVars:
       # Clave de las sesiones de Flask: Render la genera y la guarda.
