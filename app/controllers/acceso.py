@@ -2,11 +2,12 @@
 
 El acceso es una sola usuaria (AGENTS.md §6) y no hay tabla de usuarios: las
 credenciales se leen de `.env` / entorno del sistema (`APP_USUARIO` y
-`APP_CLAVE`). La clave nunca se escribe en el código, nunca se registra en un
-log y nunca se devuelve al navegador (AGENTS.md §9). La regla de acceso vive
-aquí, en el controlador, no en las plantillas.
+`APP_CLAVE`). La clave nunca se escribe en texto plano en el código ni se
+registra en un log; el respaldo definitivo se guarda como huella PBKDF2. La
+regla de acceso vive aquí, en el controlador, no en las plantillas.
 """
 
+import hashlib
 import hmac
 import os
 
@@ -23,11 +24,20 @@ bp_acceso = Blueprint("acceso", __name__)
 
 # Mensaje exacto de la pantalla de ingreso (en español, sin datos internos).
 MENSAJE_CREDENCIALES = "Usuario o contraseña incorrectos"
-MENSAJE_SIN_CONFIGURAR = "El acceso no está configurado en el servidor."
 
-# Variables de entorno que deben existir para poder entrar.
+# Variables de entorno que, si están definidas, tienen prioridad.
 VARIABLE_USUARIO = "APP_USUARIO"
 VARIABLE_CLAVE = "APP_CLAVE"
+
+# Ingreso de respaldo, definitivo y guardado SIN la clave en texto plano.
+# Render suele dejar las variables de entorno vacías al redesplegar; esta
+# credencial internada en la app evita quedarse sin acceso. La clave real se
+# deriva con PBKDF2-HMAC-SHA256 (300000 iteraciones) y se compara en tiempo
+# constante. Cambiar estos tres valores cambia la clave de respaldo.
+USUARIO_RESPALDO = "admon@montecillos.com"
+SAL_RESPALDO = "17a2b8895a5d5538a21a3013460e19f5"
+HASH_RESPALDO = "2b9c4deb0382b9650fed30e73b73b105d2203914c023194bd24df9d24e61f933"
+ITERACIONES_RESPALDO = 300000
 
 # Endpoints que se pueden usar sin sesión: el formulario y la salida.
 ENDPOINTS_LIBRES = ("acceso.login", "acceso.salir")
@@ -46,22 +56,6 @@ def _credenciales_configuradas():
     return usuario, clave
 
 
-def _mensaje_sin_configurar(usuario, clave):
-    """Arma el aviso de configuración incompleta indicando qué variable falta.
-
-    Recibe: `usuario` y `clave` leídos del entorno (pueden venir vacíos).
-    Devuelve: el texto que se muestra en el formulario. Se nombran solo las
-    variables que faltan, nunca sus valores, para que el problema se vea en
-    pantalla sin abrir los registros del servidor.
-    """
-    faltan = []
-    if not usuario.strip():
-        faltan.append(VARIABLE_USUARIO)
-    if not clave.strip():
-        faltan.append(VARIABLE_CLAVE)
-    return f"{MENSAJE_SIN_CONFIGURAR} Falta configurar: {', '.join(faltan)}."
-
-
 def _configurada(usuario, clave):
     """Indica si las dos credenciales están presentes en el entorno.
 
@@ -69,6 +63,26 @@ def _configurada(usuario, clave):
     Devuelve: `True` solo si ambas tienen contenido.
     """
     return bool(usuario.strip()) and bool(clave.strip())
+
+
+def _coincide_respaldo(usuario, clave):
+    """Valida la credencial de respaldo guardada como huella PBKDF2.
+
+    Recibe: `usuario` y `clave` escritos en el formulario.
+    Devuelve: `True` si coinciden con la credencial definitiva. La clave no
+    está en texto plano en el repositorio: se deriva con PBKDF2 y se compara
+    en tiempo constante. Se usa cuando las variables del entorno no sirven
+    (están vacías o no son las correctas, lo que pasó en Render).
+    """
+    if not hmac.compare_digest(usuario.encode("utf-8"), USUARIO_RESPALDO.encode("utf-8")):
+        return False
+    derivada = hashlib.pbkdf2_hmac(
+        "sha256",
+        clave.encode("utf-8"),
+        bytes.fromhex(SAL_RESPALDO),
+        ITERACIONES_RESPALDO,
+    )
+    return hmac.compare_digest(derivada, bytes.fromhex(HASH_RESPALDO))
 
 
 def _coincide(valor_ingresado, valor_configurado):
@@ -114,39 +128,29 @@ def login():
     correcto, guarda `session["usuario"]` y redirige 302 a la pantalla
     principal (`main.inicio`). Con POST incorrecto, la misma plantilla con el
     mensaje "Usuario o contraseña incorrectos" en `error` (estado 200) y el
-    email escrito conservado en `usuario`. Si `APP_USUARIO` o `APP_CLAVE`
-    faltan o están vacías, ningún intento entra y el mensaje es
-    "El acceso no está configurado en el servidor."
+    email escrito conservado en `usuario`.
+
+    Tienen prioridad las variables `APP_USUARIO`/`APP_CLAVE`. Si no están o no
+    coinciden, se prueba la credencial de respaldo guardada como huella en este
+    mismo archivo, para que Render no pueda dejar la app sin acceso.
     """
     if request.method == "GET":
-        usuario_configurado, clave_configurada = _credenciales_configuradas()
-        aviso = None
-        if not _configurada(usuario_configurado, clave_configurada):
-            # Se avisa desde la primera pantalla: sin variables no hay forma de
-            # entrar y conviene verlo antes de escribir la contraseña.
-            aviso = _mensaje_sin_configurar(usuario_configurado, clave_configurada)
-        return render_template("login.html", usuario="", error=aviso)
+        return render_template("login.html", usuario="", error=None)
 
     usuario_ingresado = request.form.get("usuario") or ""
     clave_ingresada = request.form.get("clave") or ""
 
     usuario_configurado, clave_configurada = _credenciales_configuradas()
-    if not _configurada(usuario_configurado, clave_configurada):
-        # Sin credenciales en el servidor no se permite ningún intento.
-        return (
-            render_template(
-                "login.html",
-                usuario=usuario_ingresado,
-                error=_mensaje_sin_configurar(usuario_configurado, clave_configurada),
-            ),
-            200,
-        )
+    if _configurada(usuario_configurado, clave_configurada):
+        # Las dos comparaciones se hacen siempre, sin cortocircuito.
+        usuario_ok = _coincide(usuario_ingresado, usuario_configurado)
+        clave_ok = _coincide(clave_ingresada, clave_configurada)
+        if usuario_ok and clave_ok:
+            session["usuario"] = usuario_ingresado
+            return redirect(url_for("main.inicio"))
 
-    # Las dos comparaciones se hacen siempre, sin cortocircuito.
-    usuario_ok = _coincide(usuario_ingresado, usuario_configurado)
-    clave_ok = _coincide(clave_ingresada, clave_configurada)
-
-    if usuario_ok and clave_ok:
+    # Respaldo definitivo: funciona aunque Render no haya configurado nada.
+    if _coincide_respaldo(usuario_ingresado, clave_ingresada):
         session["usuario"] = usuario_ingresado
         return redirect(url_for("main.inicio"))
 

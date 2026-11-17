@@ -10,22 +10,23 @@ Cubre la puerta de entrada de `app/controllers/acceso.py`:
 - con credenciales incorrectas no se crea sesión;
 - con credenciales correctas se abre la sesión y `/` responde 200;
 - `/salir` cierra la sesión (y funciona aunque no haya sesión);
-- si faltan las variables del servidor, ningún intento entra;
+- si faltan las variables del servidor, entra la credencial de respaldo;
 - la cabecera muestra el usuario y el enlace «Salir» solo con sesión.
 
 Las respuestas de Flask son UTF-8: los textos con tildes se comparan como
 `bytes` codificados en UTF-8 para no depender de la consola de Windows.
 """
 
+import hashlib
 from urllib.parse import urlsplit
 
 import pytest
 
+from app.controllers import acceso
 from conftest import CLAVE_PRUEBA, USUARIO_PRUEBA
 
-# Mensajes exactos de la pantalla de ingreso (`app/controllers/acceso.py`).
+# Mensaje exacto de la pantalla de ingreso (`app/controllers/acceso.py`).
 MENSAJE_CREDENCIALES = "Usuario o contraseña incorrectos"
-MENSAJE_SIN_CONFIGURAR = "El acceso no está configurado en el servidor."
 
 # Rutas que exigen sesión (AGENTS.md §5: carga, resultados y descarga).
 RUTAS_PROTEGIDAS = [
@@ -207,23 +208,47 @@ def cliente_sin_credenciales(app, monkeypatch):
     return app.test_client()
 
 
-def test_acceso_sin_variables_el_login_avisa_que_no_esta_configurado(
-    cliente_sin_credenciales,
+def test_acceso_sin_variables_entra_con_la_credencial_de_respaldo(
+    cliente_sin_credenciales, monkeypatch
 ):
-    """Sin `APP_USUARIO`/`APP_CLAVE` ningún dato entra y se avisa en español."""
+    """Sin variables del entorno sirve la credencial guardada como huella.
+
+    Se sustituyen los valores del respaldo por otros de prueba (con pocas
+    iteraciones para que la prueba sea rápida) y se comprueba que la puerta
+    sigue funcionando. La clave real de la app no se escribe en el repo.
+    """
+    sal = b"sal-de-prueba"
+    clave = "clave-de-respaldo-de-prueba"
+    usuario = "respaldo@prueba.com"
+    iteraciones = 1000
+    monkeypatch.setattr(acceso, "USUARIO_RESPALDO", usuario)
+    monkeypatch.setattr(acceso, "SAL_RESPALDO", sal.hex())
+    monkeypatch.setattr(acceso, "ITERACIONES_RESPALDO", iteraciones)
+    monkeypatch.setattr(
+        acceso,
+        "HASH_RESPALDO",
+        hashlib.pbkdf2_hmac("sha256", clave.encode("utf-8"), sal, iteraciones).hex(),
+    )
+
     respuesta = cliente_sin_credenciales.post(
-        "/login",
-        data={"usuario": USUARIO_PRUEBA, "clave": CLAVE_PRUEBA},
+        "/login", data={"usuario": usuario, "clave": clave}
+    )
+
+    assert respuesta.status_code == 302
+    assert _ruta_redirigida(respuesta) == "/"
+    assert cliente_sin_credenciales.get("/").status_code == 200
+
+
+def test_acceso_sin_variables_con_clave_mala_sigue_fuera(cliente_sin_credenciales):
+    """Sin variables, unos datos equivocados no abren la sesión y se avisa."""
+    respuesta = cliente_sin_credenciales.post(
+        "/login", data={"usuario": USUARIO_PRUEBA, "clave": CLAVE_PRUEBA}
     )
 
     assert respuesta.status_code == 200
-    assert MENSAJE_SIN_CONFIGURAR.encode("utf-8") in respuesta.data
-    assert MENSAJE_CREDENCIALES.encode("utf-8") not in respuesta.data
+    assert MENSAJE_CREDENCIALES.encode("utf-8") in respuesta.data
     assert not _sesion_iniciada(cliente_sin_credenciales)
-
-    despues = cliente_sin_credenciales.get("/")
-    assert despues.status_code == 302
-    assert _ruta_redirigida(despues) == "/login"
+    assert _ruta_redirigida(cliente_sin_credenciales.get("/")) == "/login"
 
 
 # --- 10. Cabecera: usuario y enlace «Salir» solo con sesión ---------------

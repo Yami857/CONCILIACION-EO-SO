@@ -35,24 +35,29 @@ Se leen de `.env` (nunca se versiona) o del entorno del sistema. Ver `.env.examp
 | `OPENROUTER_API_KEY` | Llave del agente de IA. Sin llave la app funciona y el análisis dice `no indicado`. |
 | `OPENROUTER_MODEL` | Modelo de OpenRouter (por defecto `google/gemma-4-31b-it:free`). |
 | `SECRET_KEY` | Clave de las sesiones de Flask. |
-| `APP_USUARIO` | Usuario del ingreso (un email). |
-| `APP_CLAVE` | Contraseña del ingreso. |
+| `APP_USUARIO` | Usuario del ingreso (opcional; tiene prioridad sobre el respaldo). |
+| `APP_CLAVE` | Contraseña del ingreso (opcional; tiene prioridad sobre el respaldo). |
 | `CONCILIADOR_INSUMO` | Ruta al Excel real para las pruebas (opcional). |
 
 ## Acceso
 
 La app pide usuario y contraseña antes de mostrar cualquier pantalla; no hay base de
-datos de usuarios. Las dos credenciales se leen del entorno:
+datos de usuarios. Hay dos formas de entrar, en este orden:
 
-| Variable | Contenido |
-|---|---|
-| `APP_USUARIO` | El email de la persona que usa la app. |
-| `APP_CLAVE` | Su contraseña. |
+1. **Variables del entorno** `APP_USUARIO` y `APP_CLAVE`. Si las dos están definidas,
+   tienen prioridad.
+2. **Credencial de respaldo definitiva**: usuario `admon@montecillos.com` y una clave
+   guardada solo como huella PBKDF2 dentro de `app/controllers/acceso.py` (nunca en texto
+   plano). Funciona siempre, aunque Render deje las variables vacías al redesplegar.
 
-- En local se escriben en `.env` (nunca se versiona). En **Render** se configuran en el
-  panel del servicio: **Environment** → **Add Environment Variable**, con esos dos nombres.
-- Si alguna de las dos falta o queda vacía, **no se puede entrar**: el formulario muestra
-  «El acceso no está configurado en el servidor.».
+Por eso el formulario ya no muestra el aviso de «acceso no configurado»: siempre hay una
+forma válida de entrar. Si las variables están definidas pero la clave es distinta, se
+prueba el respaldo automáticamente.
+
+- En local las variables van en `.env` (nunca se versiona). En Render, si se quieren usar,
+  van en **Environment** → **Add Environment Variable**; no son necesarias.
+- Para cambiar la clave de respaldo hay que regenerar `SAL_RESPALDO` y `HASH_RESPALDO`
+  con `hashlib.pbkdf2_hmac` y subir el cambio; la clave nueva se entrega solo a la usuaria.
 - Al entrar, la pantalla principal muestra el email en la cabecera y el enlace
   **Salir**, que cierra la sesión.
 
@@ -102,8 +107,8 @@ Y en **Environment**:
 | `SECRET_KEY` | Generar uno: `python -c "import secrets; print(secrets.token_hex(32))"` |
 | `OPENROUTER_API_KEY` | Tu llave de OpenRouter (opcional) |
 | `OPENROUTER_MODEL` | `google/gemma-4-31b-it:free` |
-| `APP_USUARIO` | El email del ingreso |
-| `APP_CLAVE` | La contraseña del ingreso |
+| `APP_USUARIO` | Opcional: email del ingreso (si se define, tiene prioridad) |
+| `APP_CLAVE` | Opcional: contraseña del ingreso (si se define, tiene prioridad) |
 
 ### Notas de producción
 
