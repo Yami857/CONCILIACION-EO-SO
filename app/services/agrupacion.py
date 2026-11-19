@@ -1,31 +1,50 @@
 """Service de la agrupación por cruce (regla R4)."""
 
 
-def _numero(valor):
-    """Convierte una celda numérica a `float`; devuelve 0.0 si no es numérica.
+def _es_numero(valor):
+    """Indica si una celda puede sumarse sin inventar un cero.
 
-    No corrige ni interpreta datos: solo evita que una celda vacía o no
-    numérica rompa la suma. Las celdas obligatorias vacías las marca R6
-    (AGENTS.md §8), no esta regla.
+    Recibe: el valor tal como viene del Excel.
+    Devuelve: `True` para números reales (no booleanos) y para texto convertible
+    a número; `False` para celdas vacías, booleanos y texto no numérico
+    (`"N/A"`, por ejemplo). Las celdas inválidas las marca R6 como "Revisar"
+    (AGENTS.md §8); esta regla solo decide si entran en la suma.
     """
     if valor is None or isinstance(valor, bool):
-        return 0.0
+        return False
     try:
-        return float(valor)
+        float(valor)
+        return True
     except (TypeError, ValueError):
-        return 0.0
+        return False
+
+
+def _numero(valor):
+    """Convierte una celda ya validada por `_es_numero` a `float`.
+
+    Recibe: un valor numérico (o texto numérico).
+    Devuelve: el `float` correspondiente. No se llama con celdas vacías ni con
+    texto no numérico: ésas se ignoran en `_sumar` para no fingir un 0.
+    """
+    return float(valor)
 
 
 def _sumar(lineas, campo):
-    """Suma una columna sobre TODAS las líneas de un documento.
+    """Suma una columna sobre las celdas numéricas de todas las líneas.
 
     Recibe: `lineas` (lista de filas del documento) y `campo` (nombre de la
     columna, por ejemplo `"Cantidad"`).
-    Devuelve: la suma como `float` redondeada a 2 decimales.
+    Devuelve: la suma como `float` redondeada a 2 decimales, contando SOLO las
+    celdas numéricas. Las celdas vacías o no numéricas se ignoran (no suman 0.0)
+    para que la cifra no finja un cero: R6 marca el cruce como "Revisar"
+    (AGENTS.md §8) y esta regla no corrige ni interpreta datos. Con el insumo
+    real, donde todo es numérico, el resultado es idéntico al de antes.
     """
     total = 0.0
     for linea in lineas or []:
-        total += _numero(linea.get(campo))
+        valor = linea.get(campo)
+        if _es_numero(valor):
+            total += _numero(valor)
     return round(total, 2)
 
 

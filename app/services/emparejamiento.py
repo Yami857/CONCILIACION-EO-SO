@@ -2,12 +2,7 @@
 
 from collections import defaultdict
 
-
-def _texto(valor):
-    """Normaliza el valor de `Tipo Doc.` a texto sin espacios en los extremos."""
-    if valor is None:
-        return ""
-    return str(valor).strip()
+from app.services.texto import texto as _texto
 
 
 def _fisico_numerico(registro):

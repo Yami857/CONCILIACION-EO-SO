@@ -47,7 +47,7 @@
     }
 
     .campo-titulo {
-        font-size: 0.72rem;
+        font-size: 0.8125rem;
         font-weight: 700;
         letter-spacing: 0.06em;
         text-transform: uppercase;
@@ -135,6 +135,7 @@
     {% endif %}
 
     <form class="formulario" method="post" action="{{ url_for('acceso.login') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="campo">
             <label class="campo-titulo" for="usuario">Usuario</label>
             <input

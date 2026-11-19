@@ -56,8 +56,8 @@ def _comparar_unitario(cruce):
 #        `costo_eo_mayor` es verdadero).
 #   - `cifras`: las cifras de control de AGENTS.md §7 y los conteos:
 #        `diferencia_global`, `suma_diferencias_eo_mayor`,
-#        `suma_diferencias_unitaria`, `cruces_total`, `cruces_eo_mayor`,
-#        `cruces_total_mayor`, `cruces_unitario_mayor`,
+#        `suma_diferencias_unitaria`, `cruces_total`, `cruces_total_mayor`,
+#        `cruces_unitario_mayor`,
 #        `cruces_unitario_igual` y `cruces_unitario_menor`.
 # Se compara el **Total del documento** (suma de la columna `Total` de todas
 # sus líneas), NO el `Costo Uni.` ni el costo por artículo, y el `Total` se usa
@@ -118,7 +118,6 @@ def r5_detectar_costo_mayor(cruces):
             "suma_diferencias_unitaria": _redondear(suma_diferencias_unitaria),
             # Conteos.
             "cruces_total": len(cruces_con_costo),
-            "cruces_eo_mayor": cruces_total_mayor,
             "cruces_total_mayor": cruces_total_mayor,
             "cruces_unitario_mayor": cruces_unitario_mayor,
             "cruces_unitario_igual": cruces_unitario_igual,

@@ -131,21 +131,34 @@ Cada entrega se construye y se verifica en pocos minutos; ninguna avanza sin que
 
 ---
 
-## 6. PREGUNTAS PARA MÍ
+## 6. PREGUNTAS PARA MÍ — RESPONDIDAS (decisiones ya tomadas)
 
-Necesito que confirmes esto antes de que `@backend` empiece:
+Todas las preguntas fueron confirmadas por la usuaria. No queda ninguna
+decisión pendiente: el equipo trabaja con estas respuestas desde la entrega 1.
 
-1. **Llave del agente:** ¿nombre exacto de la variable en `.env` y qué proveedor/modelo uso? No está en `AGENTS.md`.
-2. **Moneda:** ¿los montos son colones? ¿Muestro el símbolo o solo el número?
-3. **Export:** ¿el `.xlsx` lleva solo las 183 filas EO/SO o las 4.898 originales con las columnas nuevas?
-4. **Análisis de IA:** ¿una llamada por cruce (89) o una sola llamada por lote? Con llave gratis, 89 llamadas pueden tardar o dar 429.
-5. **Si el agente falla:** ¿la app muestra "no indicado" y permite exportar, o bloquea la descarga hasta tener análisis?
-6. **Acceso:** ¿la app es solo local para Yamileth, o necesita login/usuarios?
-7. **Historial:** ¿cada carga es independiente o hay que guardar los lotes anteriores?
-8. **`.xls`:** el documento dice `.xlsx / .xls`, pero el único insumo es `.xlsx`. ¿Soporto ambos o solo `.xlsx`?
-9. **Detalle por registro:** ¿panel/modal en la misma pantalla (mi propuesta) o página aparte?
-10. **`"Revisar"`:** ¿impide exportar ese cruce o solo lo marca y se exporta igual?
+1. **Llave del agente — RESPONDIDA.** La variable es `OPENROUTER_API_KEY` en
+   `.env` (nunca versionada), junto a `OPENROUTER_MODEL`; proveedor OpenRouter y
+   modelo por defecto `google/gemma-4-31b-it:free`. Ver `AGENTS.md` §9.
+2. **Moneda — RESPONDIDA.** Los montos se muestran sin símbolo de moneda, solo
+   el número con dos decimales.
+3. **Export — RESPONDIDA.** El `.xlsx` lleva solo las 183 filas EO/SO (14
+   columnas originales + 4 nuevas), no las 4.898 originales.
+4. **Análisis de IA — RESPONDIDA.** Una sola llamada por lote (los 89 cruces en
+   un lote), con caché por carga para no repetirla al recargar la pantalla.
+5. **Si el agente falla — RESPONDIDA.** La app muestra `"no indicado"` y NO
+   bloquea la descarga: se puede exportar igual.
+6. **Acceso — RESPONDIDA.** La app usa login con usuario y clave (una sola
+   credencial, sin base de datos de usuarios).
+7. **Historial — RESPONDIDA.** Cada carga es independiente; no se guardan los
+   lotes anteriores.
+8. **`.xls` — RESPONDIDA.** Solo `.xlsx`; un `.xls` u otro formato se rechaza
+   con un mensaje en español que contiene la palabra "Revisar".
+9. **Detalle por registro — RESPONDIDA.** Panel/modal dentro de la misma
+   pantalla de resultados, no una página aparte.
+10. **`"Revisar"` — RESPONDIDA.** No impide exportar: el cruce se exporta igual,
+    marcado con `"Revisar"` en la columna `Estado de Revisión`.
 
 ---
 
-**Alcance de este archivo:** solo se creó `PLAN.md`. No se tocó ningún otro archivo. La cadena de entregas no empieza hasta que apruebes la tabla de la sección 3 y respondas las preguntas de la sección 6.
+**Alcance de este archivo:** plan de entregas aprobado (sección 3) y preguntas
+respondidas (sección 6). La cadena de entregas ya está en ejecución.

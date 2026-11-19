@@ -1,14 +1,9 @@
 """Service del filtro de registros EO / SO (regla R2)."""
 
+from app.services.texto import texto as _texto
+
 # Los únicos dos tipos de documento que se procesan (AGENTS.md §2).
 TIPOS_EO_SO = ("EO", "SO")
-
-
-def _texto(valor):
-    """Normaliza el valor de `Tipo Doc.` a texto sin espacios en los extremos."""
-    if valor is None:
-        return ""
-    return str(valor).strip()
 
 
 # Regla R2 — Filtro de registros (AGENTS.md §3 R2)

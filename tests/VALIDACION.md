@@ -9,11 +9,11 @@ Validación de la entrega **T4** del `PLAN.md`: contraste de las **cifras de con
 | Archivo usado | `INSUMOS/MOVIMIENTOS 4-11-26.xlsx` (4.898 filas, 14 columnas, hoja `Movimientos por Tipo Documento `) |
 | Archivo de prueba complementario | `tests/fixtures/movimientos_prueba.xlsx` (10 filas, 14 columnas) |
 | Comando ejecutado | `uv run pytest -q` |
-| Resultado de pytest | **130 pruebas aprobadas, 0 fallidas**. Salida completa en `tests/_salida_pytest_acceso.txt` (la corrida histórica de T4, con 116 pruebas, quedó en `tests/_salida_pytest_t4.txt`) |
+| Resultado de pytest | **143 pruebas aprobadas, 0 fallidas** (`uv run pytest -q`, salida completa en `tests/_salida_pytest_mejoras.txt`; la corrida anterior a las mejoras, con 130 pruebas, quedó en `tests/_salida_pytest_acceso.txt` y la histórica de T4, con 116, en `tests/_salida_pytest_t4.txt`) |
 | Acceso (login) | Todas las rutas exigen sesión (`APP_USUARIO` / `APP_CLAVE` del entorno). Las 116 pruebas anteriores ahora usan un cliente con sesión iniciada y se agregaron 14 pruebas de acceso en `tests/test_acceso.py` y existe una credencial de respaldo con huella PBKDF2 que no depende de Render |
 | Método de obtención | Los valores se leyeron de la app real: `POST /cargar` + `GET /resultados` con el cliente de Flask, y del HTML renderizado (tarjetas, contadores y semáforos), además de los services R1–R7 |
 | Responsable de la validación | `@tester` (entrega 16) |
-| Alteraciones al código de la app | Ninguna (no se modificó `app/`, `wsgi.py`, `iniciar_app.bat` ni las pruebas existentes) |
+| Alteraciones al código de la app | Ninguna en `app/`, `wsgi.py`, `iniciar_app.bat` ni `pyproject.toml`. En `tests/`: se corrigió la llave eliminada `cruces_eo_mayor` → `cruces_total_mayor` en `test_r5_costos.py` (línea 89) y se agregó `test_mejoras.py` (13 pruebas) |
 
 ---
 
@@ -63,6 +63,8 @@ Comprobaciones cruzadas adicionales (todas en verde):
 - 55 + 17 + 17 = 89 cruces.
 - Orden de magnitud de §7 respetado: 341.738,47 > 272.865,75 > 49.829,07.
 
+**Reconfirmación tras las mejoras:** después de los cambios de seguridad, rendimiento y limpieza se volvieron a calcular las cifras sobre el insumo real y siguen idénticas: **89 cruces, 50 con `Total EO > Total SO`, 272.865,75 globales, 341.738,47 en alertas y 49.829,07 unitarias** (55 / 17 / 17). Evidencia: `uv run pytest -q tests/test_cifras_control.py tests/test_r5_costos.py` → 22 passed; salida en `tests/_salida_pytest_cifras_mejoras.txt`.
+
 ### Valores tal como aparecen en pantalla
 
 Los mismos números, ya formateados por la plantilla `resultados.html`:
@@ -106,11 +108,32 @@ Los siete contadores, en orden de la pantalla: **Registros EO/SO** 183 · **Cruc
 
 ---
 
+## b-bis. Mejoras de seguridad, rendimiento y limpieza
+
+Cubrimiento nuevo agregado en `tests/test_mejoras.py` (13 pruebas). Ninguna modifica una cifra, un esperado ni un dato de entrada.
+
+| # | Comportamiento nuevo | Esperado | Obtenido | Prueba | Estado |
+|---|---|---|---|---|---|
+| 20 | Health check público | `GET /health` sin sesión → 200 y cuerpo `ok` | 200, cuerpo exacto `ok`, `Content-Type` `text/plain` | `test_mejoras_health_sin_sesion_responde_200_ok` | OK |
+| 21 | Configuración de sesión y subida | Sesión 8 h, cookie HTTP-only, `SameSite=Lax`, límite 25 MB | `timedelta(hours=8)`, `True`, `"Lax"`, `25*1024*1024` | `test_mejoras_configuracion_de_sesion_y_limite_de_subida` | OK |
+| 22 | CSRF en `/login` sin token | 400 con «Solicitud no válida. Recargue la pantalla e intente de nuevo.» | 400, mensaje exacto, sin sesión | `test_mejoras_csrf_login_sin_token_devuelve_400` | OK |
+| 23 | CSRF en `/login` con token válido | 302 a `/` y sesión iniciada | 302 a `/`, `session["usuario"]` puesto | `test_mejoras_csrf_login_con_token_valido_entra` | OK |
+| 24 | CSRF en `/cargar` | Sin token → 400; con token → 302 a `/resultados` | 400 con el mensaje exacto; con token, 302 | `test_mejoras_csrf_cargar_sin_token_devuelve_400`, `test_mejoras_csrf_cargar_con_token_valido_redirige` | OK |
+| 25 | Intentos fallidos por IP | 5 fallos: el 5.º avisa «Demasiados intentos…»; el 6.º con clave correcta no crea sesión | Mensaje exacto en el 5.º y en el 6.º; sin sesión | `test_mejoras_quinto_fallo_ya_avisa_demasiados_y_el_sexto_no_entra` | OK |
+| 26 | Reinicio del contador tras ingreso correcto | Tras login correcto vuelven a hacer falta 5 fallos para bloquear | Contador a cero; 4 fallos posteriores siguen avisando «incorrectos» | `test_mejoras_login_correcto_reinicia_el_contador` | OK |
+| 27 | Caché del análisis de IA | 1 llamada en la 1.ª visita; 0 en la 2.ª y en `/descargar`; `ia_disponible=True` | 1 / 0 / 0 llamadas; `ia_disponible` capturado como `True`; descarga `.xlsx` 200 | `test_mejoras_ia_se_consulta_una_vez_y_se_reutiliza_en_resultados_y_descarga` | OK |
+| 28 | Contrato del agente, descarte por elemento | Conserva válidos, descarta inválidos; `None` solo si no queda ninguno | 2 válidos conservados; `None` con todos inválidos, lista vacía o entrada no dict | `test_mejoras_validar_contrato_conserva_validos_y_descarta_invalidos`, `test_mejoras_validar_contrato_devuelve_none_solo_si_no_queda_ninguno` | OK |
+| 29 | Sumas R4 con celda no numérica | `Total="N/A"` se ignora, no suma 0 falso | `_sumar` → 1025,5; cruce con 2 líneas EO → `total_eo=1000,00` | `test_mejoras_sumar_ignora_celdas_no_numericas`, `test_mejoras_agrupacion_no_finge_cero_con_celda_no_numerica` | OK |
+
+Para CSRF se crea la app con `create_app(instance_path=<tmp_path>)` **sin** `TESTING`, porque la validación se omite a propósito en modo de pruebas; el resto usa los fixtures con sesión de `conftest.py`. Ninguna prueba usa `skip` ni `xfail`.
+
+---
+
 ## c. Diferencias encontradas
 
 **0 diferencias.**
 
-Las 25 cifras de control de `AGENTS.md` §7 y los 19 casos verificados (17 de §8 más los 2 del acceso) coinciden exactamente con lo que devuelve la aplicación sobre `INSUMOS/MOVIMIENTOS 4-11-26.xlsx`. No se cambió ningún esperado, ninguna tolerancia ni ningún dato de entrada para que las pruebas pasaran, y no se usó `skip` ni `xfail`.
+Las 25 cifras de control de `AGENTS.md` §7, los 19 casos verificados (17 de §8 más los 2 del acceso) y los 10 comportamientos nuevos de la sección b-bis coinciden exactamente con lo que devuelve la aplicación sobre `INSUMOS/MOVIMIENTOS 4-11-26.xlsx`. No se cambió ningún esperado, ninguna tolerancia ni ningún dato de entrada para que las pruebas pasaran, y no se usó `skip` ni `xfail`. El único ajuste en `tests/` fue cambiar la llave eliminada `cruces_eo_mayor` por `cruces_total_mayor` en `test_r5_costos.py` (mismo esperado: 50), más la adición de `test_mejoras.py`.
 
 ---
 
@@ -124,9 +147,9 @@ Las 25 cifras de control de `AGENTS.md` §7 y los 19 casos verificados (17 de §
 6. **No se muestra símbolo de moneda** porque `AGENTS.md` no define la moneda. La pantalla lo dice de forma explícita: "Montos sin símbolo de moneda".
 7. **Los montos se comparan con tolerancia de 0,005** (medio centavo) porque se manejan 2 decimales. Todas las cifras cuadran además exactas, sin necesidad de la tolerancia.
 8. **Tildes en la consola de Windows.** Al ejecutar `pytest` desde PowerShell algunos acentos se ven mal en la consola (codificación de la terminal); el HTML de la app, los mensajes y los archivos son UTF-8 y en pantalla se ven correctos. No es un defecto de la app.
-9. **`/resultados` recalcula todo en cada visita** (R1 a R7) sobre la copia del Excel guardada en `instance/subidas`; no guarda resultados entre visitas. Es coherente con el alcance de "un archivo por lote".
+9. **`/resultados` recalcula R1 a R7 en cada visita** sobre la copia del Excel guardada en `instance/subidas`, pero el **análisis de IA se calcula una sola vez por carga**: se guarda en `instance/salidas/<ident>.json` y se reutiliza en visitas posteriores y en `/descargar` (0 llamadas adicionales al agente). Las cifras y los semáforos siguen siendo deterministas y los calcula el código. Cubierto por `test_mejoras_ia_se_consulta_una_vez_y_se_reutiliza_en_resultados_y_descarga`.
 10. **El archivo de prueba vive en `tests/`**, no en `INSUMOS/` (esa carpeta es de solo lectura y no contiene `movimientos_prueba.xlsx`). Tiene 10 filas, 14 columnas, mezcla EO/SO con `SO = EO − 1`, un cruce con `Total` de la EO muy superior al de la SO y un cruce con dato incompleto que fuerza `"Revisar"`.
-11. **`INSUMOS/` no se versiona** (está en `.gitignore`), así que un clon del repositorio no trae `MOVIMIENTOS 4-11-26.xlsx`. Para reproducir las cifras de control hay que definir la variable de entorno `CONCILIADOR_INSUMO` con la ruta al `.xlsx`, o colocar `MOVIMIENTOS 4-11-26.xlsx` en `INSUMOS/` en la raíz del proyecto. `tests/conftest.py` resuelve la ruta en ese orden; si el archivo no existe, las pruebas que dependen del insumo real (las de cifras de control entre ellas) se **omiten** con el mensaje "Falta el insumo real: defina CONCILIADOR_INSUMO o coloque MOVIMIENTOS 4-11-26.xlsx en INSUMOS/ (no se versiona).". La omisión es solo por ausencia de ese dato externo, no para esconder fallos: con el archivo presente corren las 130 pruebas y cualquier diferencia con `AGENTS.md` falla. Las pruebas que usan `tests/fixtures/movimientos_prueba.xlsx` (los 41 de `test_casos_limite.py`) y las del acceso (los 14 de `test_acceso.py`) corren siempre. En esta máquina, con el archivo real presente, el resultado sigue siendo **129 aprobadas, 0 omitidas, 0 fallidas**.
+11. **`INSUMOS/` no se versiona** (está en `.gitignore`), así que un clon del repositorio no trae `MOVIMIENTOS 4-11-26.xlsx`. Para reproducir las cifras de control hay que definir la variable de entorno `CONCILIADOR_INSUMO` con la ruta al `.xlsx`, o colocar `MOVIMIENTOS 4-11-26.xlsx` en `INSUMOS/` en la raíz del proyecto. `tests/conftest.py` resuelve la ruta en ese orden; si el archivo no existe, las pruebas que dependen del insumo real (las de cifras de control entre ellas) se **omiten** con el mensaje "Falta el insumo real: defina CONCILIADOR_INSUMO o coloque MOVIMIENTOS 4-11-26.xlsx en INSUMOS/ (no se versiona).". La omisión es solo por ausencia de ese dato externo, no para esconder fallos: con el archivo presente corren las 143 pruebas y cualquier diferencia con `AGENTS.md` falla. Las pruebas que usan `tests/fixtures/movimientos_prueba.xlsx` (los 41 de `test_casos_limite.py`) y las del acceso (los 14 de `test_acceso.py`) corren siempre. En esta máquina, con el archivo real presente, el resultado final (tras las mejoras) es **143 aprobadas, 0 omitidas, 0 fallidas**.
 12. **Acceso con usuario y contraseña.** Desde que se agregó el login, todas las rutas exigen sesión y redirigen a `/login` (302) si no la hay. Las credenciales se leen de `APP_USUARIO` y `APP_CLAVE` del entorno (`.env`), nunca del código. `tests/conftest.py` fija esas dos variables con valores de prueba (`prueba@montecillos.com` / `clave-de-prueba-2026`) antes de crear la app, así que la suite no depende del `.env` local, y entrega el fixture `cliente` **con sesión iniciada**: las 116 pruebas anteriores siguen comprobando exactamente lo mismo y ya no reciben el 302 a `/login`. El caso «sin variables» se prueba con el fixture `cliente_sin_credenciales`, que borra esas variables solo durante esa prueba y verifica que entra la credencial de respaldo.
 
 ---
@@ -139,17 +162,17 @@ Las 25 cifras de control de `AGENTS.md` §7 y los 19 casos verificados (17 de §
 uv run pytest -q
 ```
 
-Resultado esperado (y observado el 2026-11-11, con el login ya integrado):
+Resultado esperado (y observado el 2026-11-18, con las mejoras ya integradas):
 
 ```
-........................................................................ [ 55%]
-.........................................................                [100%]
-129 passed in 7.41s
+........................................................................ [ 50%]
+.......................................................................  [100%]
+143 passed in 3.74s
 ```
 
-- 130 pruebas: `test_acceso.py` 14 · `test_r1_carga.py` 9 · `test_r2_filtro.py` 4 · `test_r3_emparejamiento.py` 6 · `test_r4_agrupacion.py` 10 · `test_r5_costos.py` 9 · `test_r6_revisar.py` 24 · `test_cifras_control.py` 13 · `test_casos_limite.py` 41.
+- 143 pruebas: `test_acceso.py` 14 · `test_r1_carga.py` 9 · `test_r2_filtro.py` 4 · `test_r3_emparejamiento.py` 6 · `test_r4_agrupacion.py` 10 · `test_r5_costos.py` 9 · `test_r6_revisar.py` 24 · `test_cifras_control.py` 13 · `test_casos_limite.py` 41 · `test_mejoras.py` 13 (nuevo).
 - Cualquier `F` o `E` en esa salida es un hallazgo: no se debe ajustar el esperado ni el dato de entrada.
-- La salida completa de esta validación está guardada en `tests/_salida_pytest_acceso.txt` (la corrida anterior a la del login, con 116 pruebas, está en `tests/_salida_pytest_t4.txt`).
+- La salida completa de esta corrida está en `tests/_salida_pytest_mejoras.txt` (la anterior a las mejoras, con 130 pruebas, en `tests/_salida_pytest_acceso.txt`; la histórica de T4, con 116, en `tests/_salida_pytest_t4.txt`).
 
 Para ver solo las cifras de control:
 
@@ -177,13 +200,16 @@ uv run pytest -q tests/test_acceso.py
 10. Botón **"Descargar reporte"**: se obtiene un `.xlsx` con **183 filas y 18 columnas** (las 14 originales más `Cruce EO-SO`, `Diferencia de Costo`, `Análisis IA` y `Estado de Revisión`).
 11. Sin `OPENROUTER_API_KEY` en `.env`, arriba de las cifras se ve la banda de aviso "Análisis IA no disponible… Se muestra «no indicado»" y la columna de análisis dice `no indicado` en todos los cruces, **sin que cambien las cifras ni los semáforos**.
 12. Clic en **"Salir"**: vuelve a la pantalla de ingreso y, al entrar de nuevo a `http://127.0.0.1:5000/`, la app pide las credenciales otra vez.
+13. Sin iniciar sesión, abrir `http://127.0.0.1:5000/health`: responde **200** con el texto **ok** (sin pantalla de ingreso ni error 500).
+14. En el formulario de ingreso, el campo oculto `csrf_token` viaja en todo POST: enviar el formulario sin ese campo da **400** con «Solicitud no válida. Recargue la pantalla e intente de nuevo.». Tras 5 claves equivocadas desde la misma IP, el quinto intento muestra «Demasiados intentos. Intente de nuevo en unos minutos.».
 
 ---
 
 ## Resumen
 
 - Archivo de este reporte: `tests/VALIDACION.md`
-- Pruebas ejecutadas: **129** · aprobadas: **129** · fallidas: **0** (`uv run pytest -q`, 7,41 s)
-- Cifras de control verificadas: **25 de 25 OK**
+- Pruebas ejecutadas: **143** · aprobadas: **143** · fallidas: **0** (`uv run pytest -q`, 3,74 s)
+- Cifras de control verificadas: **25 de 25 OK** (reconfirmadas tras las mejoras)
 - Casos verificados: **19 de 19 OK** (17 de `AGENTS.md` §8 + 2 del acceso)
+- Comportamientos nuevos verificados: **10 de 10 OK** (13 pruebas en `test_mejoras.py`)
 - **0 diferencias**

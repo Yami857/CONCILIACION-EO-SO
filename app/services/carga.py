@@ -7,6 +7,8 @@ from zipfile import BadZipFile
 from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 
+from app.services.texto import texto as _texto
+
 # Las 14 columnas obligatorias, en el orden y con la ortografía exacta de
 # AGENTS.md §2 ("Campos reales, en orden"). No se agrega ni se renombra ninguna.
 COLUMNAS_OBLIGATORIAS = (
@@ -30,13 +32,6 @@ COLUMNAS_OBLIGATORIAS = (
 def _formato_miles(numero):
     """Devuelve un entero con separador de miles con punto (ej. 4.898)."""
     return f"{numero:,}".replace(",", ".")
-
-
-def _texto(valor):
-    """Normaliza un encabezado: texto sin espacios en los extremos."""
-    if valor is None:
-        return ""
-    return str(valor).strip()
 
 
 def _respuesta_error(mensaje):
@@ -189,7 +184,14 @@ def r1_cargar_movimientos(archivo):
             "Verifique que el archivo no esté dañado ni abierto en Excel e intente de nuevo."
         )
     except Exception:
-        # R6/§8: la app nunca se cae; el caso se reporta con la palabra "Revisar".
+        # Red de seguridad DELIBERADA (AGENTS.md §8: "sin que la app se caiga").
+        # Los except anteriores cubren los formatos de archivo y errores de
+        # lectura conocidos; este último captura cualquier fallo inesperado
+        # (openpyxl, sistema de archivos, versión de Python) y lo convierte en
+        # la misma respuesta validada `_respuesta_error`, con "Revisar" en
+        # español. Así ninguna carga malformada produce un 500. Es solo un
+        # salvavidas: no enmascara una regla de negocio ni cambia el mensaje que
+        # ve el usuario, y no escribe rutas ni datos de la empresa en logs.
         return _respuesta_error(
             f'Revisar: ocurrió un problema al leer «{nombre}». '
             "Verifique el archivo e intente de nuevo."

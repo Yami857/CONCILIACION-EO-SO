@@ -5,6 +5,7 @@ from datetime import date, datetime
 
 from app.services.agrupacion import r4_agrupar_por_cruce
 from app.services.carga import COLUMNAS_OBLIGATORIAS
+from app.services.texto import texto as _texto
 
 # Etiquetas exactas de R6 / R7 (AGENTS.md §3 R6 y R7).
 CORRECTO = "Correcto"
@@ -19,13 +20,6 @@ TIPO_SO = "SO"
 # Columnas de AGENTS.md §2 que se suman en R4 y que, por lo tanto, no pueden
 # venir como texto: `agrupacion._numero` las convertiría en 0 en silencio.
 CAMPOS_NUMERICOS = ("Cantidad", "Kilos", "Costo Uni.", "Total")
-
-
-def _texto(valor):
-    """Normaliza una celda de texto a texto sin espacios en los extremos."""
-    if valor is None:
-        return ""
-    return str(valor).strip()
 
 
 def _vacia(valor):

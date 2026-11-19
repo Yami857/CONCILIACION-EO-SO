@@ -14,3 +14,14 @@ def inicio():
     el título "Conciliador EO / SO".
     """
     return render_template("inicio.html")
+
+
+@bp_main.get("/health")
+def health():
+    """Health check público para el monitor de Render (tarea 5).
+
+    Recibe: nada.
+    Devuelve: la tupla `("ok", 200, {"Content-Type": "text/plain; charset=utf-8"})`.
+    Está en `ENDPOINTS_LIBRES`, así que no pide sesión y responde siempre igual.
+    """
+    return "ok", 200, {"Content-Type": "text/plain; charset=utf-8"}

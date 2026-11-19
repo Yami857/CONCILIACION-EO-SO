@@ -2,9 +2,10 @@
 
 import os
 import secrets
+from datetime import timedelta
 from pathlib import Path
 
-from flask import Flask
+from flask import Flask, flash, redirect, url_for
 
 from app.services.almacenamiento import purgar_antiguos
 
@@ -56,14 +57,23 @@ def create_app(instance_path=None):
     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
     app.config["JSON_AS_ASCII"] = False
 
-    # En Render (`RENDER=true`, siempre HTTPS detrás de su proxy) la cookie de
-    # sesión se envía solo por HTTPS y no es accesible desde JavaScript. En local
+    # Tarea 3 — expiración de sesión: la sesión permanente dura 8 horas y la
+    # cookie nunca es legible desde JavaScript. Estas dos últimas opciones se
+    # aplican SIEMPRE (también en local), no solo en Render.
+    app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=8)
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+
+    # Tarea 4 — límite de tamaño de subida: 25 MB. Un cuerpo mayor provoca un
+    # 413 que se convierte en un mensaje en español (ver el errorhandler abajo).
+    app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024
+
+    # En Render (`RENDER=true`, siempre HTTPS detrás de su proxy) la cookie se
+    # envía solo por HTTPS y se prefiere el esquema https para las URL. En local
     # no se activa nada de esto, para no romper http://127.0.0.1:5000.
     if os.environ.get("RENDER"):
         app.config.update(
             SESSION_COOKIE_SECURE=True,
-            SESSION_COOKIE_HTTPONLY=True,
-            SESSION_COOKIE_SAMESITE="Lax",
             PREFERRED_URL_SCHEME="https",
         )
 
@@ -79,12 +89,23 @@ def create_app(instance_path=None):
     from app.controllers.main import bp_main
     from app.controllers.resultados import bp_resultados
 
-    # El blueprint de acceso va primero: su `before_app_request` es la única
+    # El blueprint de acceso va primero: sus `before_app_request` son la única
     # puerta de entrada de las demás pantallas.
     app.register_blueprint(bp_acceso)
     app.register_blueprint(bp_main)
     app.register_blueprint(bp_carga)
     app.register_blueprint(bp_resultados)
     app.register_blueprint(bp_descarga)
+
+    @app.errorhandler(413)
+    def archivo_demasiado_grande(error):
+        """Convierte el 413 técnico en un aviso en español (tarea 4).
+
+        Recibe: el error 413 de Werkzeug (cuerpo de petición demasiado grande).
+        Devuelve: un flash con la palabra «Revisar» y una redirección 302 a
+        `main.inicio`, para que nunca se vea una página técnica de error.
+        """
+        flash("Revisar: el archivo es demasiado grande. El límite es 25 MB.", "error")
+        return redirect(url_for("main.inicio"))
 
     return app

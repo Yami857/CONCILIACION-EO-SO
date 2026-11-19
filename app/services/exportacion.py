@@ -19,6 +19,7 @@ from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
 
 from app.services.carga import COLUMNAS_OBLIGATORIAS
+from app.services.texto import texto as _texto
 
 # Las 4 columnas nuevas, con el nombre exacto de AGENTS.md §5.
 COLUMNA_CRUCE = "Cruce EO-SO"
@@ -53,13 +54,6 @@ FORMATO_DIFERENCIA = "0.00"
 # Límites de los anchos de columna del reporte.
 ANCHO_MINIMO = 10
 ANCHO_MAXIMO = 45
-
-
-def _texto(valor):
-    """Normaliza una celda de texto a texto sin espacios en los extremos."""
-    if valor is None:
-        return ""
-    return str(valor).strip()
 
 
 def _fisico_clave(valor):
@@ -270,15 +264,26 @@ def _valor_desde_json(valor):
 
 
 # Salida — Reporte Excel (AGENTS.md §5): una sola llamada a la IA por carga
-# Recibe: `filas`, la lista de `construir_filas_exportables`, y `destino`, la
-#         ruta del archivo `.json` de caché.
-# Devuelve: la ruta escrita. Guarda las filas ya armadas (con el análisis que
-#         redactó el agente) para que la descarga NO vuelva a llamar a la IA:
-#         solo lee esta caché y escribe el `.xlsx`.
-def guardar_filas_exportables(filas, destino):
-    """Guarda las filas exportables en un JSON de caché."""
+# Recibe: `filas`, la lista de `construir_filas_exportables`, `destino`, la ruta
+#         del archivo `.json` de caché, y `analisis` (opcional), el mapa
+#         `{id_cruce: texto}` que devolvió el agente.
+# Devuelve: la ruta escrita. Guarda las filas ya armadas y el análisis del
+#         agente en el MISMO JSON: la descarga NO vuelve a llamar a la IA y una
+#         nueva visita a /resultados reutiliza el análisis en vez de gaste cupo.
+#         La firma antigua, sin `analisis`, sigue funcionando (valor por defecto
+#         `None`), por lo que el código que solo guarda filas no se rompe.
+def guardar_filas_exportables(filas, destino, analisis=None):
+    """Guarda las filas exportables y, si se da, el análisis en la caché JSON."""
     ruta = Path(destino)
     ruta.parent.mkdir(parents=True, exist_ok=True)
+
+    # Solo se guardan pares de texto válidos: un análisis incompleto no se
+    # transforma en un dato falso y la caché sigue siendo determinista.
+    mapa_analisis = {
+        id_cruce: texto
+        for id_cruce, texto in (analisis or {}).items()
+        if isinstance(id_cruce, str) and isinstance(texto, str) and texto.strip()
+    }
 
     datos = {
         "columnas": list(COLUMNAS_SALIDA),
@@ -286,11 +291,36 @@ def guardar_filas_exportables(filas, destino):
             {columna: _valor_a_json(fila.get(columna)) for columna in COLUMNAS_SALIDA}
             for fila in filas or []
         ],
+        "analisis": mapa_analisis,
     }
     ruta.write_text(
         json.dumps(datos, ensure_ascii=False, indent=1), encoding="utf-8"
     )
     return ruta
+
+
+# Salida — Reporte Excel (AGENTS.md §5): reutilizar el análisis ya calculado
+# Recibe: la ruta del JSON de caché que dejó `/resultados`.
+# Devuelve: el mapa `{id_cruce: texto}` guardado, o `{}` si el archivo no
+#         existe, está dañado, es de un formato anterior o no trae análisis.
+#         Nunca lanza una excepción: una caché ilegible cae al flujo normal de
+#         consulta al agente sin que la app se caiga (AGENTS.md §8).
+def leer_analisis(ruta):
+    """Lee el análisis guardado en la caché; `{}` si no está disponible."""
+    try:
+        datos = json.loads(Path(ruta).read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return {}
+
+    analisis = datos.get("analisis") if isinstance(datos, dict) else None
+    if not isinstance(analisis, dict):
+        return {}
+
+    return {
+        id_cruce: texto
+        for id_cruce, texto in analisis.items()
+        if isinstance(id_cruce, str) and isinstance(texto, str) and texto.strip()
+    }
 
 
 # Salida — Reporte Excel (AGENTS.md §5): la descarga no llama a la IA

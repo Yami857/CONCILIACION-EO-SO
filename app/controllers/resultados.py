@@ -19,6 +19,7 @@ from app.services.emparejamiento import r3_emparejar
 from app.services.exportacion import (
     construir_filas_exportables,
     guardar_filas_exportables,
+    leer_analisis,
 )
 from app.services.filtro import r2_filtrar_eo_so
 from app.services.revision import r6_marcar_revisar, r7_marcar_semaforos
@@ -37,12 +38,13 @@ def _limpiar_sesion():
     session.pop("salida_actual", None)
 
 
-def _guardar_salida(cruces, registros, ident):
-    """Arma y guarda las filas del reporte para la descarga, sin llamar a la IA.
+def _guardar_salida(cruces, registros, ident, analisis=None):
+    """Arma y guarda las filas del reporte y el análisis, sin llamar a la IA.
 
     Recibe: `cruces` (con el `analisis` del agente ya aplicado), `registros`
-    (las filas EO/SO de R2, en el orden original del archivo) e `ident`, el
-    identificador opaco de la carga actual.
+    (las filas EO/SO de R2, en el orden original del archivo), `ident`, el
+    identificador opaco de la carga actual, y `analisis` (opcional), el mapa
+    `{id_cruce: texto}` para guardar junto con las filas.
     Devuelve: la ruta del JSON de caché en `instance/salidas` o `None` si el
     identificador no permite una ruta contenida. En sesión queda solo el
     identificador (`session["salida_actual"] = ident`), nunca la ruta, para que
@@ -55,7 +57,7 @@ def _guardar_salida(cruces, registros, ident):
         session.pop("salida_actual", None)
         return None
 
-    destino = guardar_filas_exportables(filas, destino)
+    destino = guardar_filas_exportables(filas, destino, analisis=analisis)
     session["salida_actual"] = ident
     return destino
 
@@ -74,7 +76,9 @@ def ver():
     el `analisis` del agente de IA), `cifras`, `ia_disponible` y `ia_motivo`
     (texto corto en español, sin secretos); si la sesión no permite una ruta
     contenida o si no hay archivo en sesión, una redirección a la pantalla
-    principal con un mensaje flash.
+    principal con un mensaje flash. El análisis del agente se genera una sola
+    vez por carga y se reutiliza desde `instance/salidas/<ident>.json` en las
+    visitas posteriores a `/resultados`.
     """
     ident = session.get("archivo_actual")
     ruta = ruta_subida(current_app.instance_path, ident)
@@ -138,18 +142,33 @@ def ver():
     # R7: semáforo rojo/verde con su texto, según el costo y el estado.
     cruces, resumen_semaforo = r7_marcar_semaforos(cruces)
 
-    # Agente de IA: una sola llamada por lote, después de R7. Si falta la llave,
-    # se agota el cupo, hay timeout o la respuesta no cumple el contrato, el
-    # análisis de cada cruce queda en "no indicado" y la app sigue funcionando.
-    resultado_ia = consultar_agente(cruces)
+    # Agente de IA: una sola vez POR CARGA. Si la caché de esta carga ya trae
+    # el análisis de una visita anterior, se reutiliza y NO se llama al agente
+    # (recargar /resultados no gasta cupo de OpenRouter). Si no hay caché o está
+    # dañada, se consulta una sola vez por lote. Si falta la llave, se agota el
+    # cupo, hay timeout o la respuesta no cumple el contrato, el análisis de
+    # cada cruce queda en "no indicado" y la app sigue funcionando.
+    destino_cache = ruta_salida(current_app.instance_path, ident)
+    analisis_cache = {}
+    if destino_cache is not None and destino_cache.is_file():
+        # `leer_analisis` devuelve {} si el JSON está dañado o no trae análisis:
+        # en ese caso se cae al flujo normal de consulta al agente.
+        analisis_cache = leer_analisis(destino_cache)
+
+    if isinstance(analisis_cache, dict) and analisis_cache:
+        # Análisis ya calculado para esta carga: se aplica sin consultar a la IA.
+        resultado_ia = {"ok": True, "motivo": "", "analisis": analisis_cache}
+    else:
+        resultado_ia = consultar_agente(cruces)
+
     cruces = aplicar_analisis(cruces, resultado_ia)
     ia_disponible = bool(resultado_ia.get("ok"))
     ia_motivo = "" if ia_disponible else texto_motivo(resultado_ia.get("motivo"))
 
-    # Salida — Reporte Excel (AGENTS.md §5): se arman las filas del reporte una
-    # sola vez, con el análisis que acaba de redactar el agente, y se guardan
-    # para que `/descargar` NO vuelva a llamar a la IA.
-    _guardar_salida(cruces, registros_eo_so, ident)
+    # Salida — Reporte Excel (AGENTS.md §5): se arman las filas del reporte y se
+    # guardan junto con el análisis usado, para que `/descargar` NO vuelva a
+    # llamar a la IA y la próxima visita reutilice este mismo análisis.
+    _guardar_salida(cruces, registros_eo_so, ident, resultado_ia.get("analisis"))
 
     # `pares` es la salida de R3: solo los cruces EO-SO reales. R6 agrega
     # entradas de revisión para los registros que no formaron par

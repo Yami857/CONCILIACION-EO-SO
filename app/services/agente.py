@@ -160,15 +160,18 @@ def _extraer_json(texto):
 
 # Agente de IA — contrato JSON de 4 llaves (AGENTS.md §4)
 # Recibe: `datos`, el objeto JSON devuelto por el agente.
-# Devuelve: `{id_cruce: analisis_anomalia}` si la respuesta cumple el contrato,
-#         o `None` si no lo cumple.
-# Para aceptarla se exige: la lista `resultados`, y en cada item las 4 llaves
+# Devuelve: `{id_cruce: analisis_anomalia}` con los elementos VÁLIDOS, o `None`
+#         cuando la envoltura `{"resultados": [...]}` no es válida o cuando no
+#         queda ningún elemento válido.
+# Para aceptar un elemento se exige: que sea un diccionario con las 4 llaves
 # (`id_cruce`, `costo_eo_mayor`, `analisis_anomalia`, `estado_revision`) con sus
 # tipos correctos, `estado_revision` en {"Correcto", "Revisar"} y
-# `analisis_anomalia` como texto no vacío. Si algo no cuadra, la respuesta
-# completa se descarta (AGENTS.md §8: "no indicado").
+# `analisis_anomalia` como texto no vacío. Un elemento que no cumple se
+# descarta COMPLETO y no se reutiliza ninguna de sus llaves; los demás se
+# conservan (AGENTS.md §4: "se descarta elemento por elemento"). El cruce
+# afectado queda con `analisis_anomalia = "no indicado"` al aplicar el análisis.
 def validar_contrato(datos):
-    """Valida el contrato del agente y devuelve el análisis por `id_cruce`."""
+    """Valida el contrato y devuelve el análisis de los elementos válidos."""
     if not isinstance(datos, dict):
         return None
 
@@ -178,29 +181,30 @@ def validar_contrato(datos):
 
     analisis = {}
     for item in resultados:
+        # AGENTS.md §4: descarte elemento por elemento, no de todo el lote.
         if not isinstance(item, dict):
-            return None
+            continue
         if any(llave not in item for llave in LLAVES_CONTRATO):
-            return None
+            continue
 
         id_cruce = item.get("id_cruce")
         if not isinstance(id_cruce, str) or not id_cruce.strip():
-            return None
+            continue
 
         if not isinstance(item.get("costo_eo_mayor"), bool):
-            return None
+            continue
 
         estado = item.get("estado_revision")
         if not isinstance(estado, str) or estado.strip() not in ESTADOS_VALIDOS:
-            return None
+            continue
 
         texto = item.get("analisis_anomalia")
         if not isinstance(texto, str) or not texto.strip():
-            return None
+            continue
 
         analisis[id_cruce.strip()] = texto.strip()
 
-    return analisis
+    return analisis or None
 
 
 # Agente de IA — descarte a "no indicado" (AGENTS.md §4 y §8)

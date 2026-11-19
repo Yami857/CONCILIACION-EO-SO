@@ -82,7 +82,7 @@
     }
 
     .campo-archivo-titulo {
-        font-size: 0.72rem;
+        font-size: 0.8125rem;
         font-weight: 700;
         letter-spacing: 0.06em;
         text-transform: uppercase;
@@ -226,7 +226,8 @@
         </li>
     </ul>
 
-    <form class="formulario" method="post" action="/cargar" enctype="multipart/form-data">
+    <form class="formulario" id="formulario-cargar" method="post" action="/cargar" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="campo-archivo">
             <label class="campo-archivo-titulo" for="archivo">Archivo de movimientos</label>
             <input
@@ -241,7 +242,7 @@
                 Elija el archivo y pulse «Analizar».
             </p>
         </div>
-        <button class="boton" type="submit">Analizar</button>
+        <button class="boton" id="boton-analizar" type="submit">Analizar</button>
     </form>
 
     <p class="ayuda">
@@ -250,4 +251,32 @@
         los revise antes de tomar una decisión.
     </p>
 </section>
+
+<script>
+    (function () {
+        var form = document.getElementById("formulario-cargar");
+        var boton = document.getElementById("boton-analizar");
+        if (!form || !boton) {
+            return;
+        }
+
+        var textoOriginal = boton.textContent;
+
+        form.addEventListener("submit", function () {
+            // El archivo es obligatorio: si el navegador dejó llegar hasta aquí,
+            // la validación pasó. Bloquear evita un segundo clic mientras analiza.
+            boton.disabled = true;
+            boton.textContent = "Analizando archivo…";
+        });
+
+        // Si la carga no llega a navegar (por ejemplo, al volver atrás desde el
+        // historial), la página reaparece y el botón recupera su estado.
+        window.addEventListener("pageshow", function (evento) {
+            if (evento.persisted || boton.disabled) {
+                boton.disabled = false;
+                boton.textContent = textoOriginal;
+            }
+        });
+    })();
+</script>
 {% endblock %}

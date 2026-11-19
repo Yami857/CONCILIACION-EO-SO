@@ -86,7 +86,7 @@ def test_r5_hay_89_cruces_y_50_con_total_eo_mayor(pipeline_real):
     assert len(cruces) == CRUCES_ESPERADOS
     assert cifras["cruces_total"] == CRUCES_ESPERADOS
     assert cifras["cruces_total_mayor"] == CRUCES_TOTAL_EO_MAYOR
-    assert cifras["cruces_eo_mayor"] == CRUCES_TOTAL_EO_MAYOR
+    assert cifras["cruces_total_mayor"] == CRUCES_TOTAL_EO_MAYOR
     assert sum(1 for cruce in cruces if cruce["costo_eo_mayor"]) == CRUCES_TOTAL_EO_MAYOR
 
 
