@@ -163,4 +163,19 @@
         <button class="boton" type="submit">Entrar</button>
     </form>
 </section>
+
+<script>
+    (function () {
+        var form = document.querySelector(".formulario");
+        if (!form) {
+            return;
+        }
+
+        form.addEventListener("submit", function () {
+            // Solo la pestaña que envió el formulario queda marcada.
+            // Si las credenciales están mal, el guard de base.html limpia el marcador.
+            try { sessionStorage.setItem('conciliador_sesion', '1'); } catch (e) {}
+        });
+    })();
+</script>
 {% endblock %}

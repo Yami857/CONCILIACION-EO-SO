@@ -416,7 +416,7 @@
         {% block estilos %}{% endblock %}
     </style>
 </head>
-<body>
+<body{% if session.get('usuario') %} data-autenticado="true"{% endif %}>
     <a class="salto-contenido" href="#contenido">Ir al contenido</a>
 
     <header class="cabecera">
@@ -481,5 +481,27 @@
             </p>
         </div>
     </footer>
+
+    <script>
+        (function () {
+            try {
+                var autenticado = document.body.getAttribute('data-autenticado') === 'true';
+                var marcador = sessionStorage.getItem('conciliador_sesion');
+
+                if (autenticado && marcador !== '1') {
+                    // La pestaña se cerró y reabrió (o es una pestaña nueva):
+                    // la cookie sigue viva, pero el marcador de pestaña no.
+                    function finalizar() {
+                        window.location.replace("{{ url_for('acceso.login') }}");
+                    }
+                    fetch("{{ url_for('acceso.salir') }}", { credentials: 'same-origin' })
+                        .then(finalizar, finalizar);
+                } else if (!autenticado && marcador) {
+                    // Salida o ingreso fallido: limpiar el marcador de la pestaña.
+                    sessionStorage.removeItem('conciliador_sesion');
+                }
+            } catch (e) {}
+        })();
+    </script>
 </body>
 </html>

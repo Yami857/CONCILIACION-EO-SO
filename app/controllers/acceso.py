@@ -7,9 +7,9 @@ registra en un log; el respaldo definitivo se guarda como huella PBKDF2. La
 regla de acceso vive aquí, en el controlador, no en las plantillas.
 
 Aquí viven también tres medidas de seguridad añadidas: límite de intentos
-fallidos por IP (tarea 2), sesión permanente al entrar (tarea 3) y token CSRF
-para los formularios POST (tarea 10). Ninguna necesita base de datos ni
-dependencias nuevas.
+fallidos por IP (tarea 2), sesión que termina al cerrar el navegador o la
+pestaña (tarea 3) y token CSRF para los formularios POST (tarea 10). Ninguna
+necesita base de datos ni dependencias nuevas.
 """
 
 import hashlib
@@ -263,12 +263,13 @@ def _ingresar(usuario, ip):
     """Abre la sesión de la usuaria tras validar sus credenciales.
 
     Recibe: `usuario` (el texto escrito) e `ip` (para limpiar su contador).
-    Devuelve: la redirección 302 a la pantalla principal. Marca la sesión como
-    permanente (tarea 3: durará `PERMANENT_SESSION_LIFETIME`, 8 horas) y
-    reinicia los intentos fallidos de esa IP (tarea 2).
+    Devuelve: la redirección 302 a la pantalla principal. La sesión **no** es
+    permanente: su cookie no lleva fecha de caducidad y el navegador la borra al
+    cerrarse (la pestaña se controla con `sessionStorage` en `base.html`).
+    También reinicia los intentos fallidos de esa IP (tarea 2).
     """
     _reiniciar_intentos(ip)
-    session.permanent = True
+    session.permanent = False
     session["usuario"] = usuario
     return redirect(url_for("main.inicio"))
 

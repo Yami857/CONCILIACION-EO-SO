@@ -9,6 +9,10 @@ Cubre los comportamientos nuevos que no estaban en las entregas T1–T4:
 5. Caché del análisis de IA: una sola llamada por carga (rendimiento).
 6. Contrato del agente: descarte elemento por elemento (AGENTS.md §4).
 7. Sumas R4: una celda no numérica se ignora, no se cuenta como 0 falso.
+8. Sesión que muere al cerrar el navegador/pestaña: cookie sin Max-Age/Expires,
+   atributo `data-autenticado` y guard de `sessionStorage` que entrega el
+   servidor. El comportamiento del `sessionStorage` dentro del navegador no se
+   puede ejecutar con pytest: solo se comprueba el HTML/JS que sirve el server.
 
 Las credenciales de prueba vienen de `conftest.py` (fixture autouse). Los
 clientes para CSRF usan `create_app(instance_path=<tmp_path>)` SIN `TESTING`,
@@ -19,7 +23,6 @@ del proyecto ni `INSUMOS/`.
 
 import re
 import uuid
-from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -76,8 +79,16 @@ def test_mejoras_health_sin_sesion_responde_200_ok(cliente_anonimo):
 
 
 def test_mejoras_configuracion_de_sesion_y_limite_de_subida(app):
-    """Sesión de 8 h, cookie HTTP-only, SameSite=Lax y límite de 25 MB."""
-    assert app.config["PERMANENT_SESSION_LIFETIME"] == timedelta(hours=8)
+    """Sin sesión permanente de 8 h, cookie HTTP-only, SameSite=Lax y 25 MB.
+
+    Flask 3.x mantiene `PERMANENT_SESSION_LIFETIME` en la configuración por
+    defecto (31 días) aunque la app no lo asigne: por eso no se puede comprobar
+    que la llave «no esté» en `app.config`. Lo que cambió es que la app ya no la
+    fija en 8 h (comprobado abajo con el valor por defecto). La prueba que de
+    verdad garantiza que la cookie muere al cerrar el navegador es la del
+    `Set-Cookie` sin `Max-Age`/`Expires` más adelante en este archivo.
+    """
+    assert app.config["PERMANENT_SESSION_LIFETIME"].days == 31  # ya no son 8 h
     assert app.config["SESSION_COOKIE_HTTPONLY"] is True
     assert app.config["SESSION_COOKIE_SAMESITE"] == "Lax"
     assert app.config["MAX_CONTENT_LENGTH"] == 25 * 1024 * 1024
@@ -408,3 +419,84 @@ def test_mejoras_agrupacion_no_finge_cero_con_celda_no_numerica():
     assert len(cruces) == 1
     assert cruces[0]["total_eo"] == 1000.0
     assert cruces[0]["total_so"] == 400.0
+
+
+# --- 8. Sesión que termina al cerrar navegador / pestaña ----------------------
+
+
+def test_mejoras_login_set_cookie_sin_max_age_ni_expires(tmp_path):
+    """La cookie de sesión de un login correcto no trae Max-Age ni Expires.
+
+    App con `create_app(instance_path=<tmp_path>)`, SIN `TESTING`, con token
+    CSRF del formulario e IP única en `X-Forwarded-For`: así la cookie es de
+    sesión y el navegador la elimina al cerrarse.
+    """
+    aplicacion = create_app(instance_path=str(tmp_path))
+    assert aplicacion.config.get("TESTING", False) is False
+    cliente = aplicacion.test_client()
+
+    token = _token_del_formulario(cliente.get("/login"))
+    respuesta = cliente.post(
+        "/login",
+        data={
+            "usuario": USUARIO_PRUEBA,
+            "clave": CLAVE_PRUEBA,
+            "csrf_token": token,
+        },
+        headers={"X-Forwarded-For": _ip_unica()},
+    )
+
+    assert respuesta.status_code == 302
+    cookies_sesion = [
+        valor
+        for valor in respuesta.headers.getlist("Set-Cookie")
+        if valor.strip().startswith("session=")
+    ]
+    assert len(cookies_sesion) == 1, cookies_sesion
+    cookie = cookies_sesion[0]
+    assert "Max-Age" not in cookie
+    assert "Expires" not in cookie
+
+
+def test_mejoras_con_sesion_la_raiz_lleva_data_autenticado(cliente):
+    """Con sesión iniciada, `GET /` incluye `data-autenticado="true"` en `<body>`."""
+    respuesta = cliente.get("/")
+
+    assert respuesta.status_code == 200
+    assert 'data-autenticado="true"' in _texto(respuesta)
+
+
+def test_mejoras_login_entrega_el_marcador_de_session_storage(cliente_anonimo):
+    """`GET /login` sirve el `sessionStorage.setItem` que marca la pestaña.
+
+    Nota: el efecto real del sessionStorage en el navegador no se puede probar con pytest; aquí solo se valida el HTML/JS que entrega el servidor.
+    """
+    texto = _texto(cliente_anonimo.get("/login"))
+
+    assert "sessionStorage.setItem('conciliador_sesion'" in texto
+
+
+def test_mejoras_sin_sesion_la_raiz_sirve_el_guard_de_session_storage(
+    cliente_anonimo,
+):
+    """Sin sesión, `GET /` (redirigido a `/login`) sirve getItem y `/salir`.
+
+    Nota: el efecto real del sessionStorage en el navegador no se puede probar con pytest; aquí solo se valida el HTML/JS que entrega el servidor.
+    """
+    respuesta = cliente_anonimo.get("/", follow_redirects=True)
+
+    assert respuesta.status_code == 200
+    texto = _texto(respuesta)
+    assert "sessionStorage.getItem" in texto
+    assert '"/salir"' in texto
+
+
+def test_mejoras_tras_salir_la_raiz_ya_no_lleva_data_autenticado(cliente):
+    """Tras `GET /salir`, `GET /` ya no contiene `data-autenticado="true"`."""
+    assert 'data-autenticado="true"' in _texto(cliente.get("/"))
+
+    salida = cliente.get("/salir")
+    assert salida.status_code == 302
+
+    respuesta = cliente.get("/", follow_redirects=True)
+    assert 'data-autenticado="true"' not in _texto(respuesta)

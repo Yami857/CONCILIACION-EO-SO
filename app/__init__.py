@@ -2,7 +2,6 @@
 
 import os
 import secrets
-from datetime import timedelta
 from pathlib import Path
 
 from flask import Flask, flash, redirect, url_for
@@ -57,10 +56,11 @@ def create_app(instance_path=None):
     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
     app.config["JSON_AS_ASCII"] = False
 
-    # Tarea 3 — expiración de sesión: la sesión permanente dura 8 horas y la
-    # cookie nunca es legible desde JavaScript. Estas dos últimas opciones se
-    # aplican SIEMPRE (también en local), no solo en Render.
-    app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=8)
+    # La sesión NO es permanente: la cookie no lleva Max-Age/Expires y el
+    # navegador la elimina al cerrarse. Al cerrar solo la pestaña, el marcador
+    # de `sessionStorage` de `base.html` obliga a entrar de nuevo.
+    # La cookie nunca es legible desde JavaScript y SameSite=Lax se aplica
+    # SIEMPRE (también en local), no solo en Render.
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
